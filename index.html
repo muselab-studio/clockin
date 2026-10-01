@@ -87,6 +87,11 @@ tfoot td{font-weight:700;border-bottom:0}
 .chip button{border:0;background:none;color:var(--bad);cursor:pointer;padding:0 2px}
 .addrow{display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px;margin-top:8px}
 .empty{text-align:center;padding:30px;color:var(--muted)}
+.mid{max-width:680px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.cardhead h2{margin:0}
+.cardhead input{width:auto}
 @media (max-width:560px){
   .clock .time{font-size:44px}
   .punch{grid-template-columns:repeat(2,1fr)}
@@ -125,6 +130,7 @@ const STUDIO_NAME  = "如梭映像";
 const EMAIL_DOMAIN = "clockin.timeflies.local";  // 帳號會轉成 帳號@這個網域 給 Firebase 用，員工不需要真的 email
 const MAX_ADMINS   = 2;
 const STALE_HOURS  = 18;  // 上班超過這麼久沒打下班，就視為忘記打卡
+const FIX_DAYS     = 45;  // 員工最多可以補打幾天前的卡（要和 firestore.rules 一致）
 
 /* ---------- 小工具 ---------- */
 const TYPES = { in: "上班", break_start: "開始休息", break_end: "結束休息", out: "下班" };
@@ -169,9 +175,9 @@ function makeDemoStore() {
       set("session", u.uid); me = u; return strip(u);
     },
     async signOut() { set("session", null); me = null; },
-    async addPunch(type, uid = me.uid, at = null) {
+    async addPunch(type, uid = me.uid, at = null, reason = "") {
       const p = get("punches", []);
-      p.push({ id: uuid(), uid, type, ts: (at || new Date()).getTime(), manual: !!at });
+      p.push({ id: uuid(), uid, type, ts: (at || new Date()).getTime(), manual: !!at, by: me.uid, reason });
       set("punches", p);
     },
     async punchesFor(uid, start, end) { return get("punches", []).filter(p => p.uid === uid && p.ts >= +start && p.ts < +end).map(toP); },
@@ -198,7 +204,7 @@ async function makeFirebaseStore(cfg) {
   let me = null;
 
   const loadProfile = async uid => { const s = await F.getDoc(F.doc(db, "users", uid)); return s.exists() ? { uid, ...s.data() } : null; };
-  const fromSnap = s => { const d = s.data(); return { id: s.id, uid: d.uid, type: d.type, ts: d.ts ? d.ts.toDate() : new Date(), manual: !!d.manual }; };
+  const fromSnap = s => { const d = s.data(); return { id: s.id, uid: d.uid, type: d.type, ts: d.ts ? d.ts.toDate() : new Date(), manual: !!d.manual, by: d.by || "", reason: d.reason || "" }; };
   const mapErr = e => {
     const c = e?.code || "";
     if (c.includes("email-already-in-use")) return new Error("這個帳號已經有人使用");
@@ -241,10 +247,10 @@ async function makeFirebaseStore(cfg) {
       return strip(me);
     },
     async signOut() { await A.signOut(auth); me = null; },
-    async addPunch(type, uid = me.uid, at = null) {
+    async addPunch(type, uid = me.uid, at = null, reason = "") {
       try {
         await F.addDoc(punchesCol, {
-          uid, type, manual: !!at, by: auth.currentUser.uid,
+          uid, type, manual: !!at, by: auth.currentUser.uid, reason,
           ts: at ? F.Timestamp.fromDate(at) : F.serverTimestamp(),   // 員工打卡一律用伺服器時間，不能改手機時間作弊
         });
       } catch (e) { throw mapErr(e); }
@@ -318,7 +324,7 @@ const liveBrk  = s => s.brk  + (s.ongoing && s.openBrk != null ? Date.now() - s.
 const S = {
   store: null, me: null,
   role: "staff", mode: "signin", msg: null, busy: false, adminLeft: MAX_ADMINS,
-  mine: [],
+  mine: [], myMonth: fmtMonth(new Date()), myShifts: null, fixMsg: null,
   month: fmtMonth(new Date()), admin: null, selected: null, open: new Set(), adminMsg: null,
 };
 const app = document.getElementById("app");
@@ -383,7 +389,7 @@ function viewStaff() {
   const next = { off: "in", work: "out", break: "break_end" }[state];
 
   return `
-  <div class="wrap narrow">
+  <div class="wrap mid">
     <div class="top">
       <div><h1>嗨，${esc(S.me.displayName)}</h1><div class="muted small">${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 星期${WEEK[now.getDay()]}</div></div>
       <button class="btn" data-act="logout">登出</button>
@@ -404,9 +410,74 @@ function viewStaff() {
     </div>
     <div class="card">
       <h2>今天的打卡紀錄</h2>
-      ${todayPunches.length ? `<ul class="list">${todayPunches.map(p => `<li><span>${TYPES[p.type]}${p.manual ? ` <span class="muted small">（管理員補登）</span>` : ""}</span><b>${fmtTime(p.ts)}</b></li>`).join("")}</ul>` : `<div class="empty">今天還沒有打卡</div>`}
+      ${todayPunches.length ? `<ul class="list">${todayPunches.map(p => `<li><span>${TYPES[p.type]}${p.manual ? ` <span class="muted small">（${manualLabel(p)}）</span>` : ""}</span><b>${fmtTime(p.ts)}</b></li>`).join("")}</ul>` : `<div class="empty">今天還沒有打卡</div>`}
     </div>
+    ${viewMyMonth()}
+    ${viewFixForm()}
   </div>`;
+}
+
+function viewMyMonth() {
+  const sh = S.myShifts;
+  const work = sh ? sh.reduce((a, s) => a + liveWork(s), 0) : 0;
+  const brk = sh ? sh.reduce((a, s) => a + liveBrk(s), 0) : 0;
+  const days = sh ? new Set(sh.filter(s => s.in).map(s => s.date)).size : 0;
+  return `
+  <div class="card" style="margin-top:16px">
+    <div class="cardhead">
+      <h2>我的打卡明細</h2>
+      <input type="month" id="myMonthPick" value="${S.myMonth}" max="${fmtMonth(new Date())}">
+    </div>
+    ${!sh ? `<div class="empty">讀取中…</div>` : `
+      <div class="small muted" style="margin-bottom:8px">出勤 <b style="color:var(--ink)">${days}</b> 天・工時 <b style="color:var(--ink)">${fmtDurLong(work)}</b>（${toHours(work)} 小時）・休息 ${fmtDur(brk)}</div>
+      ${shiftTable(sh, "me", p => p.manual && p.by === S.me.uid)}
+      <p class="small muted" style="margin:10px 0 0">點任一天可以看原始打卡。自己補登的紀錄如果打錯，可以在那裡刪除。</p>`}
+  </div>`;
+}
+
+function viewFixForm() {
+  const now = new Date();
+  const min = new Date(); min.setDate(min.getDate() - FIX_DAYS + 1);
+  return `
+  <div class="card" style="margin-top:16px">
+    <h2 style="margin-bottom:4px">補打卡</h2>
+    <div class="small muted">忘記打卡時，選擇日期和時間補上。補登的紀錄會標示給管理員看，可以補 ${FIX_DAYS} 天內的卡。</div>
+    <form id="fixForm">
+      <label>打卡類型</label>
+      <select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
+      <div class="two">
+        <div><label>日期</label><input type="date" name="date" required value="${fmtDate(now)}" min="${fmtDate(min)}" max="${fmtDate(now)}"></div>
+        <div><label>時間</label><input type="time" name="time" required></div>
+      </div>
+      <label>原因（選填）</label>
+      <input name="reason" maxlength="50" placeholder="例如：忘記打下班、手機沒電">
+      <button class="btn primary block" ${S.busy ? "disabled" : ""}>送出補打卡</button>
+    </form>
+    ${S.fixMsg ? `<div class="msg ${S.fixMsg.kind}">${esc(S.fixMsg.text)}</div>` : ""}
+  </div>`;
+}
+
+/* 每日明細表（前台、後台共用） */
+const manualLabel = p => !p.manual ? "" : (p.by && p.by === p.uid ? "員工補登" : "管理員補登");
+function shiftTable(shifts, keyPrefix, canDelete) {
+  if (!shifts.length) return `<div class="empty">這個月沒有打卡紀錄</div>`;
+  return `<div class="tablewrap"><table>
+    <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>休息時段</th><th class="right">休息</th><th class="right">工時</th><th>狀態</th></tr></thead>
+    <tbody>
+    ${shifts.map((s, i) => {
+      const key = keyPrefix + ":" + i;
+      const st = (s.ongoing ? `<span class="pill work">進行中</span>` : s.issue ? `<span class="pill bad">${s.issue}</span>` : `<span class="muted small">正常</span>`)
+        + (s.punches.some(p => p.manual) ? ` <span class="pill break">含補登</span>` : "");
+      const row = `<tr class="click" data-act="toggle" data-v="${esc(key)}">
+        <td>${dayLabel(s.date)}</td><td>${fmtTime(s.in)}</td><td>${fmtTime(s.out)}</td>
+        <td class="small">${s.breaks.length ? s.breaks.map(b => `${fmtTime(b[0])}–${fmtTime(b[1])}`).join("、") : `<span class="muted">—</span>`}</td>
+        <td class="right">${fmtDur(liveBrk(s))}</td><td class="right"><b>${fmtDur(liveWork(s))}</b></td><td>${st}</td></tr>`;
+      const raw = S.open.has(key) ? `<tr class="raw"><td colspan="7"><span class="small muted">原始打卡：</span>${s.punches.map(p =>
+        `<span class="chip">${TYPES[p.type]} ${fmtTime(p.ts)}${p.manual ? `（${manualLabel(p)}${p.reason ? `：${esc(p.reason)}` : ""}）` : ""}${canDelete(p) ? `<button title="刪除" data-act="del" data-v="${esc(p.id)}">✕</button>` : ""}</span>`).join("")}</td></tr>` : "";
+      return row + raw;
+    }).join("")}
+    </tbody>
+  </table></div>`;
 }
 
 /* ---------- 畫面：管理後台 ---------- */
@@ -441,15 +512,16 @@ function viewSummary(A) {
   <div class="card">
     <h2>${S.month.replace("-", " 年 ")} 月・全員總覽</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>姓名</th><th>帳號</th><th class="right">出勤天數</th><th class="right">總工時</th><th class="right">（小時）</th><th class="right">總休息</th><th class="right">異常</th></tr></thead>
+      <thead><tr><th>姓名</th><th>帳號</th><th class="right">出勤天數</th><th class="right">總工時</th><th class="right">（小時）</th><th class="right">總休息</th><th class="right">員工補登</th><th class="right">異常</th></tr></thead>
       <tbody>
         ${A.rows.map(r => `<tr class="click" data-act="pick" data-v="${esc(r.user.uid)}">
           <td><b>${esc(r.user.displayName)}</b></td><td class="muted">${esc(r.user.username)}</td>
           <td class="right">${r.days}</td><td class="right"><b>${fmtDur(r.work)}</b></td><td class="right muted">${toHours(r.work)}</td>
           <td class="right">${fmtDur(r.brk)}</td>
+          <td class="right">${r.fixes ? `<span class="pill break">${r.fixes}</span>` : `<span class="muted">—</span>`}</td>
           <td class="right">${r.issues ? `<span class="pill bad">${r.issues}</span>` : `<span class="muted">—</span>`}</td></tr>`).join("")}
       </tbody>
-      <tfoot><tr><td>合計</td><td></td><td class="right">${tot.days}</td><td class="right">${fmtDur(tot.work)}</td><td class="right">${toHours(tot.work)}</td><td class="right">${fmtDur(tot.brk)}</td><td class="right">${tot.issues || "—"}</td></tr></tfoot>
+      <tfoot><tr><td>合計</td><td></td><td class="right">${tot.days}</td><td class="right">${fmtDur(tot.work)}</td><td class="right">${toHours(tot.work)}</td><td class="right">${fmtDur(tot.brk)}</td><td></td><td class="right">${tot.issues || "—"}</td></tr></tfoot>
     </table></div>
     <p class="small muted" style="margin:12px 0 0">點任一位員工可以看每天的明細、補登或刪除打卡。工時 = 上班到下班扣掉休息。</p>
   </div>`;
@@ -468,21 +540,7 @@ function viewDetail(r) {
       <div class="stat"><span class="muted small">出勤天數</span><b>${r.days} 天</b></div>
       <div class="stat"><span class="muted small">總休息</span><b>${fmtDur(r.brk)}</b></div>
     </div>
-    ${r.shifts.length ? `<div class="tablewrap"><table>
-      <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>休息時段</th><th class="right">休息</th><th class="right">工時</th><th>狀態</th></tr></thead>
-      <tbody>
-      ${r.shifts.map((s, i) => {
-        const key = r.user.uid + ":" + i;
-        const st = s.ongoing ? `<span class="pill work">進行中</span>` : s.issue ? `<span class="pill bad">${s.issue}</span>` : `<span class="muted small">正常</span>`;
-        const row = `<tr class="click" data-act="toggle" data-v="${esc(key)}">
-          <td>${dayLabel(s.date)}</td><td>${fmtTime(s.in)}</td><td>${fmtTime(s.out)}</td>
-          <td class="small">${s.breaks.length ? s.breaks.map(b => `${fmtTime(b[0])}–${fmtTime(b[1])}`).join("、") : `<span class="muted">—</span>`}</td>
-          <td class="right">${fmtDur(liveBrk(s))}</td><td class="right"><b>${fmtDur(liveWork(s))}</b></td><td>${st}</td></tr>`;
-        const raw = S.open.has(key) ? `<tr class="raw"><td colspan="7"><span class="small muted">原始打卡：</span>${s.punches.map(p => `<span class="chip">${TYPES[p.type]} ${fmtTime(p.ts)}${p.manual ? "（補登）" : ""}<button title="刪除" data-act="del" data-v="${esc(p.id)}">✕</button></span>`).join("")}</td></tr>` : "";
-        return row + raw;
-      }).join("")}
-      </tbody>
-    </table></div>` : `<div class="empty">這個月沒有打卡紀錄</div>`}
+    ${shiftTable(r.shifts, r.user.uid, () => true)}
     <div style="margin-top:20px;border-top:1px solid var(--line);padding-top:16px">
       <h2 style="font-size:15px;margin-bottom:4px">補登打卡</h2>
       <div class="small muted">員工忘記打卡時，可以在這裡補上正確時間。</div>
@@ -502,6 +560,23 @@ async function loadMine() {
   S.mine = await S.store.punchesFor(S.me.uid, start, end);
 }
 
+async function loadMyMonth() {
+  const [y, m] = S.myMonth.split("-").map(Number);
+  const start = new Date(y, m - 1, 1), end = new Date(y, m, 1);
+  const margin = STALE_HOURS * 3600e3;
+  try {
+    const ps = await S.store.punchesFor(S.me.uid, new Date(+start - margin), new Date(Math.min(+end + margin, Date.now() + 60000)));
+    S.myShifts = computeShifts(ps).filter(s => s.date.startsWith(S.myMonth));
+  } catch (e) {
+    S.myShifts = [];
+    S.fixMsg = { text: "讀取明細失敗：" + (e.message || e), kind: "err" };
+  }
+}
+
+async function reloadStaff() {
+  await Promise.all([loadMine(), loadMyMonth()]);
+}
+
 async function loadAdmin() {
   S.admin = null; render();
   const [y, m] = S.month.split("-").map(Number);
@@ -519,6 +594,7 @@ async function loadAdmin() {
         brk: shifts.reduce((a, s) => a + liveBrk(s), 0),
         days: new Set(shifts.filter(s => s.in).map(s => s.date)).size,
         issues: shifts.filter(s => s.issue).length,
+        fixes: shifts.flatMap(s => s.punches).filter(p => p.manual && p.by === p.uid).length,
       };
     }).sort((a, b) => a.user.displayName.localeCompare(b.user.displayName, "zh-Hant"));
     S.admin = { rows };
@@ -533,13 +609,13 @@ function exportCSV() {
   const lines = [];
   const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
   lines.push([`${S.month} 月總覽`].map(q).join(","));
-  lines.push(["姓名", "帳號", "出勤天數", "總工時(時:分)", "總工時(小時)", "總休息(小時)", "異常筆數"].map(q).join(","));
-  for (const r of S.admin.rows) lines.push([r.user.displayName, r.user.username, r.days, fmtDur(r.work), toHours(r.work), toHours(r.brk), r.issues].map(q).join(","));
+  lines.push(["姓名", "帳號", "出勤天數", "總工時(時:分)", "總工時(小時)", "總休息(小時)", "員工補登筆數", "異常筆數"].map(q).join(","));
+  for (const r of S.admin.rows) lines.push([r.user.displayName, r.user.username, r.days, fmtDur(r.work), toHours(r.work), toHours(r.brk), r.fixes, r.issues].map(q).join(","));
   lines.push("");
   lines.push(["每日明細"].map(q).join(","));
   lines.push(["姓名", "日期", "上班", "下班", "休息時段", "休息(小時)", "工時(時:分)", "工時(小時)", "狀態"].map(q).join(","));
   for (const r of S.admin.rows) for (const s of r.shifts)
-    lines.push([r.user.displayName, s.date, fmtTime(s.in), fmtTime(s.out), s.breaks.map(b => `${fmtTime(b[0])}-${fmtTime(b[1])}`).join(" "), toHours(liveBrk(s)), fmtDur(liveWork(s)), toHours(liveWork(s)), s.ongoing ? "進行中" : (s.issue || "正常")].map(q).join(","));
+    lines.push([r.user.displayName, s.date, fmtTime(s.in), fmtTime(s.out), s.breaks.map(b => `${fmtTime(b[0])}-${fmtTime(b[1])}`).join(" "), toHours(liveBrk(s)), fmtDur(liveWork(s)), toHours(liveWork(s)), (s.ongoing ? "進行中" : (s.issue || "正常")) + (s.punches.some(p => p.manual) ? "・含補登" : "")].map(q).join(","));
   const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = `打卡工時_${S.month}.csv`;
@@ -549,9 +625,19 @@ function exportCSV() {
 
 /* ---------- 渲染與事件 ---------- */
 function render() {
+  // 重新畫面時保留表單裡已經填的內容
+  const saved = {};
+  for (const id of ["fixForm", "addForm"]) {
+    const f = document.getElementById(id);
+    if (f) saved[id] = [...f.elements].filter(el => el.name).map(el => [el.name, el.value]);
+  }
   if (!S.me) app.innerHTML = viewLogin();
   else if (S.me.role === "admin") app.innerHTML = viewAdmin();
   else app.innerHTML = viewStaff();
+  for (const [id, vals] of Object.entries(saved)) {
+    const f = document.getElementById(id);
+    if (f) for (const [n, v] of vals) if (f.elements[n]) f.elements[n].value = v;
+  }
 }
 
 async function refreshAdminLeft() {
@@ -561,7 +647,7 @@ async function refreshAdminLeft() {
 async function afterLogin() {
   setMsg(null);
   if (S.me.role === "admin") { S.selected = null; S.open.clear(); await loadAdmin(); }
-  else { await loadMine(); render(); }
+  else { S.open.clear(); S.myMonth = fmtMonth(new Date()); S.myShifts = null; S.fixMsg = null; await reloadStaff(); render(); }
 }
 
 app.addEventListener("click", async e => {
@@ -575,7 +661,7 @@ app.addEventListener("click", async e => {
   else if (act === "punch") {
     if (S.busy) return;
     S.busy = true; setMsg(null); render();
-    try { await S.store.addPunch(v); await loadMine(); setMsg(`${TYPES[v]}打卡成功 ${fmtTime(new Date())}`, "ok"); }
+    try { await S.store.addPunch(v); await reloadStaff(); setMsg(`${TYPES[v]}打卡成功 ${fmtTime(new Date())}`, "ok"); }
     catch (err) { setMsg("打卡失敗：" + (err.message || err)); }
     S.busy = false; render();
   }
@@ -587,14 +673,20 @@ app.addEventListener("click", async e => {
   else if (act === "del") {
     e.stopPropagation();
     if (!confirm("確定要刪除這筆打卡嗎？")) return;
+    if (S.me.role !== "admin") {
+      try { await S.store.deletePunch(v); S.fixMsg = { text: "已刪除這筆補登", kind: "ok" }; }
+      catch (err) { S.fixMsg = { text: "刪除失敗：" + (err.message || err), kind: "err" }; }
+      await reloadStaff(); render(); return;
+    }
     try { await S.store.deletePunch(v); S.adminMsg = { text: "已刪除", kind: "ok" }; }
     catch (err) { S.adminMsg = { text: "刪除失敗：" + (err.message || err), kind: "err" }; }
     await loadAdmin();
   }
 });
 
-app.addEventListener("change", e => {
+app.addEventListener("change", async e => {
   if (e.target.id === "monthPick" && e.target.value) { S.month = e.target.value; S.open.clear(); S.adminMsg = null; loadAdmin(); }
+  if (e.target.id === "myMonthPick" && e.target.value) { S.myMonth = e.target.value; S.open.clear(); S.myShifts = null; render(); await loadMyMonth(); render(); }
 });
 
 app.addEventListener("submit", async e => {
@@ -627,6 +719,27 @@ app.addEventListener("submit", async e => {
     }
   }
 
+  if (e.target.id === "fixForm") {
+    const form = e.target;
+    const type = String(f.get("type"));
+    const at = new Date(`${f.get("date")}T${f.get("time")}`);
+    const reason = String(f.get("reason") || "").trim().slice(0, 50);
+    const oldest = new Date(); oldest.setDate(oldest.getDate() - FIX_DAYS + 1); oldest.setHours(0, 0, 0, 0);
+    if (isNaN(at)) { S.fixMsg = { text: "請選擇日期和時間", kind: "err" }; return render(); }
+    if (at > new Date()) { S.fixMsg = { text: "不能補打未來的時間", kind: "err" }; return render(); }
+    if (at < oldest) { S.fixMsg = { text: `只能補 ${FIX_DAYS} 天內的卡，更早的請找管理員`, kind: "err" }; return render(); }
+    if (!confirm(`確定要補打卡嗎？\n\n${TYPES[type]}　${fmtDate(at)} ${fmtTime(at)}`)) return;
+    S.busy = true; S.fixMsg = null; render();
+    try {
+      await S.store.addPunch(type, S.me.uid, at, reason);
+      S.myMonth = fmtMonth(at);
+      await reloadStaff();
+      S.fixMsg = { text: `已補登 ${TYPES[type]} ${fmtDate(at)} ${fmtTime(at)}`, kind: "ok" };
+      document.getElementById("fixForm")?.reset();
+    } catch (err) { S.fixMsg = { text: "補打卡失敗：" + (err.message || err), kind: "err" }; }
+    S.busy = false; render();
+  }
+
   if (e.target.id === "addForm") {
     const at = new Date(String(f.get("at")));
     if (isNaN(at)) return;
@@ -644,7 +757,8 @@ setInterval(() => {
   if (!c) return;
   const n = new Date();
   c.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
-  if (n.getSeconds() === 0 && S.me?.role === "staff" && !S.busy) render();
+  const typing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName);
+  if (n.getSeconds() === 0 && S.me?.role === "staff" && !S.busy && !typing) render();
 }, 1000);
 
 /* ---------- 啟動 ---------- */
