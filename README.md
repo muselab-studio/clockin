@@ -7,6 +7,37 @@
 
 沒填 Firebase 設定時會進入**示範模式**，資料只存在當下那台瀏覽器，適合先試用畫面。
 
+- **排班**：後台「排班表」分頁以月曆排班（可一次排多人、可跨夜），同步統計每人每月排班天數、排班時數，並和實際工時對照；前台會顯示「今天上班的人員」和自己接下來兩週的班
+
+## 排班
+
+- 管理員在後台切到「排班表」，點月曆上任一天即可新增、修改、刪除班次
+- 排班工時 = 下班 − 上班 − 休息時間；下班時間早於上班時間時視為跨夜班
+- 預設時間 08:30–22:30、休息 60 分鐘，可在「排班預設值」修改
+- 工時提醒（依勞基法與雙週變形工時）：單日排班超過 10 小時、超過 12 小時、連續上班超過 6 天；填了「雙週變形工時週期起始日」後，也會提醒兩週排班超過 80 小時
+- 資料存在 Firestore 的 `schedules` 集合（一個班一筆：`uid`、`name`、`date`、`start`、`end`、`breakMin`），預設值存在 `meta/schedule`，不會動到 `users` 和 `punches`
+
+### 啟用排班要加的 Firestore 規則
+
+到 **Firestore → 規則**，在 `match /databases/{database}/documents {` 裡面、其他 `match` 旁邊加上這兩段，然後按「發布」：
+
+```
+    // 排班：登入的人都能看班表，只有管理員能排班
+    match /schedules/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/meta/admins).data.uids;
+    }
+    // 排班預設值
+    match /meta/schedule {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/meta/admins).data.uids;
+    }
+```
+
+沒加這段的話，打卡功能照常運作，只是後台排班會顯示「沒有權限」、前台看不到班表。
+
 ## 工時怎麼算
 
 - 一段「上班 → 下班」算一個班次，歸在上班那天（跨午夜也算同一班）
