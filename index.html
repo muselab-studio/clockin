@@ -108,6 +108,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .sc.flag{box-shadow:inset 0 0 0 1.5px var(--bad)}
 .sc.flag::before{content:"!";font-weight:700;color:var(--bad);margin-right:3px}
 .sc .t{opacity:.75}
+.sc.off{background:transparent;color:var(--muted);border:1px dashed var(--muted);padding:1px 4px}
+.picks button:disabled{opacity:.4;cursor:not-allowed}
 .more{font-size:11px;color:var(--muted)}
 .dotname{--pc:#857d74;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;flex:none;font-weight:700;font-size:13px;
   background:color-mix(in srgb,var(--pc) 16%,var(--card));color:color-mix(in srgb,var(--pc) 88%,var(--ink))}
@@ -174,7 +176,8 @@ const EMAIL_DOMAIN = "clockin.timeflies.local";  // 帳號會轉成 帳號@這�
 const MAX_ADMINS   = 2;
 const STALE_HOURS  = 18;  // 上班超過這麼久沒打下班，就視為忘記打卡
 const FIX_DAYS     = 45;  // 員工最多可以補打幾天前的卡（要和 firestore.rules 一致）
-const SCHED_DEFAULTS = { start: "08:30", end: "22:30", breakMin: 60, cycleStart: "" };  // 排班預設值（後台可改）
+const SCHED_DEFAULTS = { start: "09:30", end: "18:30", breakMin: 60, cycleStart: "" };  // 排班預設值（後台可改）
+const LEAVE_TYPES = ["休假", "例假", "休息日", "特休", "病假", "事假", "其他"];      // 休假的假別選項
 
 /* ---------- 小工具 ---------- */
 const TYPES = { in: "上班", break_start: "開始休息", break_end: "結束休息", out: "下班" };
@@ -207,6 +210,11 @@ const shiftLabel = s => `${s.start}–${s.end}${isOvernight(s) ? "（跨夜）" 
 const PCOLORS = ["#4f8a66", "#b5674a", "#a07a22", "#3f78a0", "#8a5a9a", "#5e7d7a", "#9a5a6a"];
 const pcolor = uid => { let h = 0; for (const c of String(uid)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PCOLORS[h % PCOLORS.length]; };
 const byStart = (a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start);
+// schedules 集合裡同時放「班」和「休假」：kind 為 "leave" 的是休假（沒有上下班時間）
+const isLeave = s => s.kind === "leave";
+const shiftsOnly = list => list.filter(s => !isLeave(s));
+const leavesOnly = list => list.filter(isLeave);
+const leaveLabel = s => s.leaveType || "休假";
 // 月曆一頁從週一排到週日
 function gridRange(month) {
   const [y, m] = month.split("-").map(Number);
@@ -216,7 +224,7 @@ function gridRange(month) {
 // 依班表算工時提醒：單日 >10h、>12h、連續上班 7 天以上、雙週總時數 >80h
 function analyzeSchedule(list, settings) {
   const per = {};   // uid -> { date: 當天排班工時 }
-  for (const s of list) { (per[s.uid] ??= {}); per[s.uid][s.date] = (per[s.uid][s.date] || 0) + shiftHours(s); }
+  for (const s of shiftsOnly(list)) { (per[s.uid] ??= {}); per[s.uid][s.date] = (per[s.uid][s.date] || 0) + shiftHours(s); }
   const dayFlags = {};   // "uid|date" -> [提醒]
   const add = (u, d, m) => (dayFlags[u + "|" + d] ??= []).push(m);
   for (const [u, dates] of Object.entries(per)) {
@@ -277,7 +285,7 @@ function makeDemoStore() {
     async deletePunch(id) { set("punches", get("punches", []).filter(p => p.id !== id)); },
     async listStaff() { return get("users", []).filter(u => u.role === "staff").map(strip); },
     async schedulesBetween(from, to) { return get("schedules", []).filter(s => s.date >= from && s.date <= to); },
-    async addSchedules(items) { set("schedules", [...get("schedules", []), ...items.map(it => ({ ...it, id: uuid(), by: me.uid }))]); },
+    async addSchedules(items, delIds = []) { set("schedules", [...get("schedules", []).filter(s => !delIds.includes(s.id)), ...items.map(it => ({ ...it, id: uuid(), by: me.uid }))]); },
     async updateSchedule(id, fields) { set("schedules", get("schedules", []).map(s => s.id === id ? { ...s, ...fields, by: me.uid } : s)); },
     async deleteSchedule(id) { set("schedules", get("schedules", []).filter(s => s.id !== id)); },
     async getScheduleSettings() { return get("schedSettings", {}); },
@@ -379,11 +387,13 @@ async function makeFirebaseStore(cfg) {
     async schedulesBetween(from, to) {
       try {
         const q = F.query(schedCol, F.where("date", ">=", from), F.where("date", "<=", to));
-        return (await F.getDocs(q)).docs.map(s => { const d = s.data(); return { id: s.id, uid: d.uid, name: d.name || "", date: d.date, start: d.start, end: d.end, breakMin: d.breakMin || 0 }; });
+        return (await F.getDocs(q)).docs.map(s => { const d = s.data(); return { id: s.id, uid: d.uid, name: d.name || "", date: d.date, kind: d.kind || "shift", leaveType: d.leaveType || "", start: d.start || "", end: d.end || "", breakMin: d.breakMin || 0 }; });
       } catch (e) { throw mapErr(e); }
     },
-    async addSchedules(items) {
+    // 新增多筆（班或休假）；delIds 是要一起刪掉的舊資料（例如設休假時刪掉當天的班），一次寫入
+    async addSchedules(items, delIds = []) {
       const b = F.writeBatch(db);
+      for (const id of delIds) b.delete(F.doc(db, "schedules", id));
       for (const it of items) b.set(F.doc(schedCol), { ...it, by: auth.currentUser.uid, updatedAt: F.serverTimestamp() });
       try { await b.commit(); } catch (e) { throw mapErr(e); }
     },
@@ -446,7 +456,7 @@ const S = {
   month: fmtMonth(new Date()), admin: null, selected: null, open: new Set(), adminMsg: null,
   // 排班
   adminTab: "attendance", sched: null, day: null, schedMsg: null,
-  crew: null, myUpcoming: [], crewErr: null,
+  crew: null, offToday: [], myUpcoming: [], crewErr: null,
 };
 const app = document.getElementById("app");
 
@@ -551,12 +561,14 @@ function viewCrew() {
         <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
         <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}</span></span>
         <b>${shiftLabel(s)}</b></li>`).join("")}</ul>`;
+  const off = (S.offToday || []).map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}`);
   return `
   <div class="card" style="margin-bottom:16px">
     <h2>今天上班的人員</h2>
     ${crewHtml}
+    ${off.length ? `<div class="small muted" style="margin-top:10px">今天休假：${off.join("、")}</div>` : ""}
     ${upcoming.length ? `<h2 style="font-size:15px;margin:18px 0 4px">我接下來的班</h2>
-      <ul class="list">${upcoming.map(s => `<li><span>${dayLabel(s.date)}</span><b>${shiftLabel(s)}</b></li>`).join("")}</ul>` : ""}
+      <ul class="list">${upcoming.map(s => `<li><span>${dayLabel(s.date)}</span>${isLeave(s) ? `<span class="pill off">${esc(leaveLabel(s))}</span>` : `<b>${shiftLabel(s)}</b>`}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
 
@@ -719,16 +731,19 @@ function viewSchedule() {
   let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
     const k = fmtDate(d);
-    const shifts = (byDate[k] || []).sort(byStart);
-    const chips = shifts.slice(0, 4).map(s => {
-      const fl = dayFlags[s.uid + "|" + k];
+    const shifts = shiftsOnly(byDate[k] || []).sort(byStart);
+    const leaves = leavesOnly(byDate[k] || []).sort((a, b) => schedName(a).localeCompare(schedName(b), "zh-Hant"));
+    const items = [...shifts, ...leaves];
+    const chips = items.slice(0, 4).map(s => {
       const name = schedName(s);
+      if (isLeave(s)) return `<div class="sc off" title="${esc(`${name} ${leaveLabel(s)}`)}">休 ${esc(name)} <span class="t">${esc(leaveLabel(s))}</span></div>`;
+      const fl = dayFlags[s.uid + "|" + k];
       const tip = `${name} ${shiftLabel(s)}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
       return `<div class="sc${fl ? " flag" : ""}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}" data-act="sday" data-v="${k}">
       <div class="dnum">${d.getDate()}${shifts.length ? `<span>${shifts.length} 人</span>` : ""}</div>
-      ${chips}${shifts.length > 4 ? `<div class="more">還有 ${shifts.length - 4} 人</div>` : ""}
+      ${chips}${items.length > 4 ? `<div class="more">還有 ${items.length - 4} 筆</div>` : ""}
     </div>`;
   }
   return `
@@ -743,7 +758,7 @@ function viewSchedule() {
     </div>
     ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
     <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能新增、修改或刪除那天的班。標「!」的班有工時提醒，點進去可以看原因。</p>
+    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
   ${viewSchedSettings()}`;
@@ -755,9 +770,13 @@ function viewSchedSummary() {
   const mFrom = fmtDate(first), mTo = fmtDate(last);
   const { dayFlags, cycleFlags } = analyzeSchedule(P.list, P.settings);
   const stats = {};
-  const ensure = uid => (stats[uid] ??= { days: new Set(), hours: 0 });
+  const ensure = uid => (stats[uid] ??= { days: new Set(), hours: 0, off: new Set() });
   P.staff.forEach(u => ensure(u.uid));
-  for (const s of P.list) if (s.date >= mFrom && s.date <= mTo) { const st = ensure(s.uid); st.days.add(s.date); st.hours += shiftHours(s); }
+  for (const s of P.list) if (s.date >= mFrom && s.date <= mTo) {
+    const st = ensure(s.uid);
+    if (isLeave(s)) { st.off.add(s.date); continue; }
+    st.days.add(s.date); st.hours += shiftHours(s);
+  }
   const uids = Object.keys(stats);
   if (!uids.length) return `<div class="card" style="margin-top:16px"><div class="empty">還沒有員工帳號。請員工到前台「申請員工帳號」，申請後就能排班。</div></div>`;
 
@@ -773,21 +792,21 @@ function viewSchedSummary() {
   warns.forEach(w => wc[w.uid] = (wc[w.uid] || 0) + 1);
 
   const actual = Object.fromEntries((P.rows || []).map(r => [r.user.uid, r.work]));
-  const rows = uids.map(uid => ({ uid, name: schedName({ uid }), days: stats[uid].days.size, hours: stats[uid].hours, actual: actual[uid] }))
+  const rows = uids.map(uid => ({ uid, name: schedName({ uid }), days: stats[uid].days.size, off: stats[uid].off.size, hours: stats[uid].hours, actual: actual[uid] }))
     .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, "zh-Hant"));
-  const tot = rows.reduce((a, r) => ({ days: a.days + r.days, hours: a.hours + r.hours, actual: a.actual + (r.actual || 0) }), { days: 0, hours: 0, actual: 0 });
+  const tot = rows.reduce((a, r) => ({ days: a.days + r.days, off: a.off + r.off, hours: a.hours + r.hours, actual: a.actual + (r.actual || 0) }), { days: 0, off: 0, hours: 0, actual: 0 });
   return `
   <div class="card" style="margin-top:16px">
     <h2>${first.getMonth() + 1} 月排班時數</h2>
     <div class="tablewrap"><table>
-      <thead><tr><th>姓名</th><th class="right">排班天數</th><th class="right">排班時數</th><th class="right">實際工時</th><th class="right">提醒</th></tr></thead>
+      <thead><tr><th>姓名</th><th class="right">排班天數</th><th class="right">休假天數</th><th class="right">排班時數</th><th class="right">實際工時</th><th class="right">提醒</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <td><span class="sc" style="--pc:${pcolor(r.uid)};display:inline-block;font-size:13px">${esc(r.name)}</span></td>
-        <td class="right">${r.days}</td><td class="right"><b>${fmtH(r.hours)}</b></td>
+        <td class="right">${r.days}</td><td class="right">${r.off || `<span class="muted">—</span>`}</td><td class="right"><b>${fmtH(r.hours)}</b></td>
         <td class="right">${r.actual == null ? `<span class="muted">—</span>` : toHours(r.actual)}</td>
         <td class="right">${wc[r.uid] ? `<span class="pill bad">${wc[r.uid]}</span>` : `<span class="muted">—</span>`}</td></tr>`).join("")}
       </tbody>
-      <tfoot><tr><td>合計</td><td class="right">${tot.days}</td><td class="right">${fmtH(tot.hours)}</td><td class="right">${toHours(tot.actual)}</td><td></td></tr></tfoot>
+      <tfoot><tr><td>合計</td><td class="right">${tot.days}</td><td class="right">${tot.off}</td><td class="right">${fmtH(tot.hours)}</td><td class="right">${toHours(tot.actual)}</td><td></td></tr></tfoot>
     </table></div>
     ${warns.length ? `<ul class="warns">${warns.map(w => `<li>${esc(w.text)}</li>`).join("")}</ul>` : ""}
     <p class="small muted" style="margin:12px 0 0">排班時數已扣掉休息時間；實際工時就是「出勤總覽」的總工時（上班到下班扣掉休息）。${P.settings.cycleStart ? "" : "在下方填雙週變形工時的週期起始日後，也會檢查每兩週 80 小時上限。"}</p>
@@ -828,14 +847,54 @@ function calcLine(f) {
 
 function viewDayModal() {
   const D = S.day, P = S.sched;
-  const shifts = P.list.filter(s => s.date === D.date).sort(byStart);
+  const dayList = P.list.filter(s => s.date === D.date);
+  const shifts = shiftsOnly(dayList).sort(byStart);
+  const leaves = leavesOnly(dayList).sort((a, b) => schedName(a).localeCompare(schedName(b), "zh-Hant"));
+  const offUids = new Set(leaves.map(s => s.uid));
+  const shiftUids = new Set(shifts.map(s => s.uid));
   const { dayFlags } = analyzeSchedule(P.list, P.settings);
   const d = parseDate(D.date);
   const editing = !!D.editId;
+  const leaveMode = D.mode === "leave";
+  // 排班時，當天休假的人不能選；設休假時，已經休假的人不能再選
+  const pickBtn = u => {
+    const off = offUids.has(u.uid);
+    const disabled = leaveMode ? off : off && !(editing && D.pick.has(u.uid));
+    const note = off ? "（休）" : leaveMode && shiftUids.has(u.uid) ? "（有班）" : "";
+    return `<button type="button" data-act="spick" data-v="${esc(u.uid)}" class="${D.pick.has(u.uid) ? "on" : ""}" ${disabled ? "disabled" : ""}>${esc(u.displayName)}${note}</button>`;
+  };
+  const picks = P.staff.length ? `<div class="picks">${P.staff.map(pickBtn).join("")}</div>`
+    : `<div class="small muted">還沒有員工帳號，員工到前台申請後就能排班。</div>`;
+  const form = leaveMode ? `
+      <h3>設定休假</h3>
+      <form id="schedForm">
+        <label>人員（可複選）</label>
+        ${picks}
+        <label>假別</label>
+        <select name="leaveType">${LEAVE_TYPES.map(t => `<option ${t === D.leaveType ? "selected" : ""}>${t}</option>`).join("")}</select>
+        <div class="calc">休假的人當天不能排班；如果這天已經有班，設為休假時會一併刪除那個班。</div>
+        ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
+        <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : "設為休假"}</button>
+      </form>` : `
+      <h3>${editing ? "修改排班" : "新增排班"}</h3>
+      <form id="schedForm">
+        <label>${editing ? "人員" : "人員（可複選）"}</label>
+        ${picks}
+        <div class="two">
+          <div><label>上班時間</label><input type="time" name="start" value="${esc(D.form.start)}" required></div>
+          <div><label>下班時間</label><input type="time" name="end" value="${esc(D.form.end)}" required></div>
+        </div>
+        <label>休息時間（分鐘，不算工時）</label>
+        <input type="number" name="breakMin" min="0" step="5" value="${Number(D.form.breakMin) || 0}">
+        <button type="button" class="btn sm" data-act="sdefault" style="margin-top:8px">套用預設時間</button>
+        <div class="calc" id="sCalc">${calcLine(D.form)}</div>
+        ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
+        <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : editing ? "儲存修改" : "加入班表"}</button>
+      </form>`;
   return `
   <div class="modal-bg" data-close="1">
     <div class="modal" role="dialog" aria-modal="true">
-      <h2 style="margin:0 0 8px">${d.getMonth() + 1} 月 ${d.getDate()} 日（週${WEEK[d.getDay()]}）排班</h2>
+      <h2 style="margin:0 0 8px">${d.getMonth() + 1} 月 ${d.getDate()} 日（週${WEEK[d.getDay()]}）</h2>
       ${shifts.length ? `<ul class="list">${shifts.map(s => {
         const fl = dayFlags[s.uid + "|" + D.date];
         const name = schedName(s);
@@ -848,24 +907,20 @@ function viewDayModal() {
             <button class="btn sm" data-act="sedit" data-v="${esc(s.id)}">修改</button>
             <button class="btn sm danger" data-act="sdel" data-v="${esc(s.id)}">刪除</button>
           </span></li>`;
-      }).join("")}</ul>` : `<div class="empty" style="padding:16px">這天還沒有排班</div>`}
+      }).join("")}</ul>` : `<div class="empty" style="padding:12px">這天還沒有排班</div>`}
+      ${leaves.length ? `<h3 style="margin:14px 0 2px">休假</h3><ul class="list">${leaves.map(s => {
+        const name = schedName(s);
+        return `<li><span class="rowl who">
+            <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
+            <span class="who"><b>${esc(name)}</b><span class="small muted">${esc(leaveLabel(s))}</span></span></span>
+          <button class="btn sm danger" data-act="sdel" data-v="${esc(s.id)}">取消休假</button></li>`;
+      }).join("")}</ul>` : ""}
       <hr>
-      <h3>${editing ? "修改排班" : "新增排班"}</h3>
-      <form id="schedForm">
-        <label>${editing ? "人員" : "人員（可複選）"}</label>
-        ${P.staff.length ? `<div class="picks">${P.staff.map(u => `<button type="button" data-act="spick" data-v="${esc(u.uid)}" class="${D.pick.has(u.uid) ? "on" : ""}">${esc(u.displayName)}</button>`).join("")}</div>`
-          : `<div class="small muted">還沒有員工帳號，員工到前台申請後就能排班。</div>`}
-        <div class="two">
-          <div><label>上班時間</label><input type="time" name="start" value="${esc(D.form.start)}" required></div>
-          <div><label>下班時間</label><input type="time" name="end" value="${esc(D.form.end)}" required></div>
-        </div>
-        <label>休息時間（分鐘，不算工時）</label>
-        <input type="number" name="breakMin" min="0" step="5" value="${Number(D.form.breakMin) || 0}">
-        <button type="button" class="btn sm" data-act="sdefault" style="margin-top:8px">套用預設時間</button>
-        <div class="calc" id="sCalc">${calcLine(D.form)}</div>
-        ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
-        <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : editing ? "儲存修改" : "加入班表"}</button>
-      </form>
+      ${editing ? "" : `<div class="seg" style="margin:12px 0 0">
+        <button type="button" data-act="smode" data-v="shift" class="${!leaveMode ? "on" : ""}">排班</button>
+        <button type="button" data-act="smode" data-v="leave" class="${leaveMode ? "on" : ""}">休假</button>
+      </div>`}
+      ${form}
       <div class="btnrow">
         ${editing ? `<button class="btn" data-act="scancel">取消修改</button>` : ""}
         <button class="btn" data-act="sclose">關閉</button>
@@ -899,11 +954,13 @@ async function loadStaffSchedule() {
   const today = fmtDate(new Date());
   try {
     const list = await S.store.schedulesBetween(today, fmtDate(addDays(new Date(), 13)));
-    S.crew = list.filter(s => s.date === today).sort(byStart);
+    const todays = list.filter(s => s.date === today);
+    S.crew = shiftsOnly(todays).sort(byStart);
+    S.offToday = leavesOnly(todays);
     S.myUpcoming = list.filter(s => s.uid === S.me.uid).sort(byStart);
     S.crewErr = null;
   } catch (e) {
-    S.crew = []; S.myUpcoming = [];
+    S.crew = []; S.offToday = []; S.myUpcoming = [];
     S.crewErr = "讀不到班表";
     console.warn("讀取班表失敗（如果還沒更新 Firestore 規則，這是正常的）：", e);
   }
@@ -975,9 +1032,10 @@ async function refreshSchedList() {
   catch (e) { S.sched.err = "讀取班表失敗：" + (e.message || e) + RULES_HINT; }
 }
 
-function openDay(date, editId = null) {
+function openDay(date, editId = null, mode = "shift") {
   const st = S.sched.settings;
-  S.day = { date, editId: null, pick: new Set(), form: { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0 }, msg: null };
+  const leaveType = S.day?.leaveType || LEAVE_TYPES[0];
+  S.day = { date, mode, leaveType, editId: null, pick: new Set(), form: { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0 }, msg: null };
   if (editId) {
     const s = S.sched.list.find(x => x.id === editId);
     if (s) Object.assign(S.day, { editId, pick: new Set([s.uid]), form: { start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0 } });
@@ -1052,6 +1110,7 @@ app.addEventListener("click", async e => {
   if (act === "sday") { openDay(v); render(); return; }
   if (act === "sedit") { openDay(S.day.date, v); render(); return; }
   if (act === "scancel") { openDay(S.day.date); render(); return; }
+  if (act === "smode") { openDay(S.day.date, null, v); render(); return; }
   if (act === "sclose") { S.day = null; render(); return; }
   if (act === "spick") {
     if (S.day.editId) S.day.pick = new Set([v]);
@@ -1064,13 +1123,15 @@ app.addEventListener("click", async e => {
   }
   if (act === "sdel") {
     const s = S.sched.list.find(x => x.id === v);
-    if (!s || !confirm(`確定要刪除 ${schedName(s)} ${dayLabel(s.date)} ${shiftLabel(s)} 這個班嗎？`)) return;
+    if (!s) return;
+    const what = isLeave(s) ? `的${leaveLabel(s)}` : ` ${shiftLabel(s)} 這個班`;
+    if (!confirm(isLeave(s) ? `確定要取消 ${schedName(s)} ${dayLabel(s.date)}${what}嗎？` : `確定要刪除 ${schedName(s)} ${dayLabel(s.date)}${what}嗎？`)) return;
     S.busy = true; render();
     try {
       await S.store.deleteSchedule(v);
       await refreshSchedList();
-      if (S.day.editId === v) openDay(S.day.date);
-      S.day.msg = { text: `已刪除 ${schedName(s)} 的班`, kind: "ok" };
+      if (S.day.editId === v) openDay(S.day.date, null, S.day.mode);
+      S.day.msg = { text: isLeave(s) ? `已取消 ${schedName(s)} 的${leaveLabel(s)}` : `已刪除 ${schedName(s)} 的班`, kind: "ok" };
     } catch (err) { S.day.msg = { text: "刪除失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
     S.busy = false; render(); return;
   }
@@ -1116,6 +1177,7 @@ app.addEventListener("change", async e => {
 app.addEventListener("input", e => {
   const form = e.target.form;
   if (form?.id !== "schedForm" || !S.day || !e.target.name) return;
+  if (e.target.name === "leaveType") { S.day.leaveType = e.target.value; return; }
   S.day.form[e.target.name] = e.target.name === "breakMin" ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
   const c = document.getElementById("sCalc");
   if (c) c.innerHTML = calcLine(S.day.form);
@@ -1125,12 +1187,39 @@ app.addEventListener("submit", async e => {
   e.preventDefault();
   const f = new FormData(e.target);
 
+  if (e.target.id === "schedForm" && S.day?.mode === "leave") {
+    const D = S.day;
+    const fail = t => { D.msg = { text: t, kind: "err" }; render(); };
+    if (!D.pick.size) return fail("請選擇至少一位人員");
+    const leaveType = String(f.get("leaveType") || LEAVE_TYPES[0]);
+    D.leaveType = leaveType;
+    const nameFor = uid => staffName(uid) || "";
+    const dayList = S.sched.list.filter(s => s.date === D.date);
+    const already = new Set(leavesOnly(dayList).map(s => s.uid));
+    const uids = [...D.pick].filter(u => !already.has(u));
+    if (!uids.length) return fail("選的人這天已經是休假了");
+    // 這天已經有班的人：確認後一起刪掉那些班
+    const clash = shiftsOnly(dayList).filter(s => uids.includes(s.uid));
+    if (clash.length && !confirm(`${clash.map(s => `${schedName(s)}（${shiftLabel(s)}）`).join("、")} 這天已經有排班。\n設為休假會一併刪除這些班，確定嗎？`)) return;
+    S.busy = true; D.msg = null; render();
+    try {
+      await S.store.addSchedules(uids.map(uid => ({ uid, name: nameFor(uid), date: D.date, kind: "leave", leaveType })), clash.map(s => s.id));
+      await refreshSchedList();
+      openDay(D.date, null, "leave");
+      S.day.msg = { text: `已設為${leaveType}：${uids.map(nameFor).join("、")}${clash.length ? `（已刪除 ${clash.length} 個班）` : ""}`, kind: "ok" };
+    } catch (err) { D.msg = { text: "儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
+    S.busy = false; render();
+    return;
+  }
+
   if (e.target.id === "schedForm") {
     const D = S.day;
     const fm = { start: String(f.get("start") || ""), end: String(f.get("end") || ""), breakMin: Math.max(0, Number(f.get("breakMin")) || 0) };
     D.form = fm;
     const fail = t => { D.msg = { text: t, kind: "err" }; render(); };
     if (!D.pick.size) return fail("請選擇至少一位人員");
+    const offHere = leavesOnly(S.sched.list.filter(s => s.date === D.date)).filter(s => D.pick.has(s.uid));
+    if (offHere.length) return fail(`${offHere.map(schedName).join("、")} 這天休假，不能排班（要排班請先取消休假）`);
     if (!fm.start || !fm.end) return fail("請填上班和下班時間");
     if (fm.start === fm.end) return fail("上班和下班時間不能一樣");
     if (shiftHours(fm) <= 0) return fail("扣掉休息時間後工時是 0，請檢查時間");
