@@ -104,7 +104,8 @@ tfoot td{font-weight:700;border-bottom:0}
 .cal .dnum{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
 .cal .dnum span{font-weight:400;color:var(--muted);font-size:11px}
 .sc{--pc:#857d74;font-size:11px;line-height:1.35;border-radius:6px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;
-  background:color-mix(in srgb,var(--pc) 16%,var(--card));color:color-mix(in srgb,var(--pc) 88%,var(--ink))}
+  border-left:3px solid var(--pc);
+  background:color-mix(in srgb,var(--pc) 18%,var(--card));color:color-mix(in srgb,var(--pc) 58%,var(--ink))}
 .sc.flag{box-shadow:inset 0 0 0 1.5px var(--bad)}
 .sc.flag::before{content:"!";font-weight:700;color:var(--bad);margin-right:3px}
 .sc .t{opacity:.75}
@@ -112,7 +113,11 @@ tfoot td{font-weight:700;border-bottom:0}
 .picks button:disabled{opacity:.4;cursor:not-allowed}
 .more{font-size:11px;color:var(--muted)}
 .dotname{--pc:#857d74;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;flex:none;font-weight:700;font-size:13px;
-  background:color-mix(in srgb,var(--pc) 16%,var(--card));color:color-mix(in srgb,var(--pc) 88%,var(--ink))}
+  box-shadow:inset 0 0 0 2px var(--pc);
+  background:color-mix(in srgb,var(--pc) 18%,var(--card));color:color-mix(in srgb,var(--pc) 58%,var(--ink))}
+.colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 16px}
+.colors .rowl{padding:6px 0}
+.colorpick{width:44px;height:34px;padding:2px;border-radius:8px;cursor:pointer;flex:none}
 .who{flex:1;min-width:0}
 .who .small{display:block}
 .rowl{display:flex;align-items:center;gap:10px}
@@ -208,7 +213,10 @@ const shiftHours = s => { let span = toMin(s.end) - toMin(s.start); if (span <= 
 const fmtH = h => String(Math.round(h * 100) / 100);
 const shiftLabel = s => `${s.start}–${s.end}${isOvernight(s) ? "（跨夜）" : ""}`;
 const PCOLORS = ["#4f8a66", "#b5674a", "#a07a22", "#3f78a0", "#8a5a9a", "#5e7d7a", "#9a5a6a"];
-const pcolor = uid => { let h = 0; for (const c of String(uid)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PCOLORS[h % PCOLORS.length]; };
+const isHex = c => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
+const defaultColor = uid => { let h = 0; for (const c of String(uid)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PCOLORS[h % PCOLORS.length]; };
+// 管理員在「人員顏色」設定過的顏色優先，沒設定就用自動配色
+const pcolor = uid => isHex(S.colors[uid]) ? S.colors[uid] : defaultColor(uid);
 const byStart = (a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start);
 // schedules 集合裡同時放「班」和「休假」：kind 為 "leave" 的是休假（沒有上下班時間）
 const isLeave = s => s.kind === "leave";
@@ -401,7 +409,7 @@ async function makeFirebaseStore(cfg) {
       try { await F.updateDoc(F.doc(db, "schedules", id), { ...fields, by: auth.currentUser.uid, updatedAt: F.serverTimestamp() }); } catch (e) { throw mapErr(e); }
     },
     async deleteSchedule(id) { try { await F.deleteDoc(F.doc(db, "schedules", id)); } catch (e) { throw mapErr(e); } },
-    async getScheduleSettings() { try { const s = await F.getDoc(schedSettingsRef); return s.exists() ? s.data() : {}; } catch { return {}; } },
+    async getScheduleSettings() { try { const s = await F.getDoc(schedSettingsRef); return s.exists() ? s.data() : {}; } catch (e) { throw mapErr(e); } },
     async saveScheduleSettings(v) { try { await F.setDoc(schedSettingsRef, v); } catch (e) { throw mapErr(e); } },
   };
 }
@@ -457,6 +465,7 @@ const S = {
   // 排班
   adminTab: "attendance", sched: null, day: null, schedMsg: null,
   crew: null, offToday: [], myUpcoming: [], crewErr: null,
+  colors: {},   // uid -> 顏色（存在 meta/schedule 的 colors）
 };
 const app = document.getElementById("app");
 
@@ -761,7 +770,26 @@ function viewSchedule() {
     <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
+  ${viewSchedColors()}
   ${viewSchedSettings()}`;
+}
+
+function viewSchedColors() {
+  const P = S.sched;
+  if (!P.staff.length) return "";
+  const custom = P.settings.colors || {};
+  return `
+  <div class="card" style="margin-top:16px">
+    <h2 style="margin-bottom:4px">人員顏色</h2>
+    <div class="small muted" style="margin-bottom:8px">點色塊就能換顏色，班表、統計和前台都會一起換。</div>
+    <div class="colors">${P.staff.map(u => `
+      <div class="rowl">
+        <input type="color" class="colorpick" data-color="${esc(u.uid)}" value="${pcolor(u.uid)}" aria-label="${esc(u.displayName)} 的顏色" ${S.busy ? "disabled" : ""}>
+        <span class="sc" style="--pc:${pcolor(u.uid)};font-size:13px;flex:1">${esc(u.displayName)}</span>
+        ${isHex(custom[u.uid]) ? `<button class="btn sm" data-act="scolorreset" data-v="${esc(u.uid)}">預設</button>` : ""}
+      </div>`).join("")}
+    </div>
+  </div>`;
 }
 
 function viewSchedSummary() {
@@ -952,6 +980,7 @@ async function loadMyMonth() {
 // 前台用：今天上班的人員、我接下來兩週的班
 async function loadStaffSchedule() {
   const today = fmtDate(new Date());
+  S.store.getScheduleSettings().then(st => { S.colors = st.colors || {}; render(); }).catch(() => {});   // 只用來顯示人員顏色
   try {
     const list = await S.store.schedulesBetween(today, fmtDate(addDays(new Date(), 13)));
     const todays = list.filter(s => s.date === today);
@@ -1014,9 +1043,11 @@ async function loadSchedule() {
   ]);
   if (month !== S.month) return;   // 讀取中又切了月份
   if (rows.status === "fulfilled") S.admin = { rows: rows.value, month };
+  if (settings.status === "fulfilled") S.colors = settings.value.colors || {};
   S.sched = {
     list: list.status === "fulfilled" ? list.value : [],
     settings: { ...SCHED_DEFAULTS, ...(settings.status === "fulfilled" ? settings.value : {}) },
+    settingsOk: settings.status === "fulfilled",   // 讀不到設定時不准存，避免把已存的設定蓋掉
     rows: rows.status === "fulfilled" ? rows.value : [],
     staff: rows.status === "fulfilled" ? rows.value.map(r => r.user) : [],
     err: list.status === "rejected" ? "讀取班表失敗：" + (list.reason?.message || list.reason) + RULES_HINT
@@ -1030,6 +1061,18 @@ async function loadSchedule() {
 async function refreshSchedList() {
   try { S.sched.list = await S.store.schedulesBetween(...schedRange()); S.sched.err = null; }
   catch (e) { S.sched.err = "讀取班表失敗：" + (e.message || e) + RULES_HINT; }
+}
+
+// 存某個人的顏色（hex 為 null 代表恢復自動配色）；整份設定一起寫回，不會動到預設時間
+async function saveColor(uid, hex) {
+  if (!S.sched.settingsOk) { S.schedMsg = { text: "讀不到目前的設定，為了避免覆蓋，請按「重新整理」後再改顏色", kind: "err" }; render(); return; }
+  const colors = { ...(S.sched.settings.colors || {}) };
+  if (hex && isHex(hex)) colors[uid] = hex.toLowerCase(); else delete colors[uid];
+  const v = { ...S.sched.settings, colors };
+  S.busy = true; render();
+  try { await S.store.saveScheduleSettings(v); S.sched.settings = v; S.colors = colors; S.schedMsg = null; }
+  catch (err) { S.schedMsg = { text: "顏色儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; window.scrollTo(0, 0); }
+  S.busy = false; render();
 }
 
 function openDay(date, editId = null, mode = "shift") {
@@ -1117,6 +1160,7 @@ app.addEventListener("click", async e => {
     else S.day.pick.has(v) ? S.day.pick.delete(v) : S.day.pick.add(v);
     render(); return;
   }
+  if (act === "scolorreset") { await saveColor(v, null); return; }
   if (act === "sdefault") {
     const st = S.sched.settings;
     S.day.form = { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0 }; render(); return;
@@ -1138,7 +1182,7 @@ app.addEventListener("click", async e => {
 
   if (act === "role") { S.role = v; setMsg(null); if (v === "admin") await refreshAdminLeft(); render(); }
   else if (act === "mode") { S.mode = v; setMsg(null); if (S.role === "admin") await refreshAdminLeft(); render(); }
-  else if (act === "logout") { await S.store.signOut(); S.me = null; S.mine = []; S.admin = null; S.adminMsg = null; S.sched = null; S.day = null; S.schedMsg = null; S.crew = null; S.myUpcoming = []; S.mode = "signin"; setMsg(null); render(); }
+  else if (act === "logout") { await S.store.signOut(); S.me = null; S.mine = []; S.admin = null; S.adminMsg = null; S.sched = null; S.day = null; S.schedMsg = null; S.crew = null; S.myUpcoming = []; S.colors = {}; S.mode = "signin"; setMsg(null); render(); }
   else if (act === "punch") {
     if (S.busy) return;
     S.busy = true; setMsg(null); render();
@@ -1166,6 +1210,7 @@ app.addEventListener("click", async e => {
 });
 
 app.addEventListener("change", async e => {
+  if (e.target.dataset?.color) { await saveColor(e.target.dataset.color, e.target.value); return; }
   if (e.target.id === "monthPick" && e.target.value) {
     S.month = e.target.value; S.open.clear(); S.adminMsg = null; S.schedMsg = null;
     S.adminTab === "schedule" ? loadSchedule() : loadAdmin();
@@ -1176,6 +1221,8 @@ app.addEventListener("change", async e => {
 // 排班視窗：改時間時即時更新工時試算（不重畫整個畫面，才不會打斷輸入）
 app.addEventListener("input", e => {
   const form = e.target.form;
+  // 拖動色盤時先即時預覽旁邊的名字，放開（change）才存檔
+  if (e.target.dataset?.color) { const chip = e.target.nextElementSibling; if (chip) chip.style.setProperty("--pc", e.target.value); return; }
   if (form?.id !== "schedForm" || !S.day || !e.target.name) return;
   if (e.target.name === "leaveType") { S.day.leaveType = e.target.value; return; }
   S.day.form[e.target.name] = e.target.name === "breakMin" ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
@@ -1243,7 +1290,9 @@ app.addEventListener("submit", async e => {
   }
 
   if (e.target.id === "schedSetForm") {
+    if (!S.sched.settingsOk) { S.schedMsg = { text: "讀不到目前的設定，為了避免覆蓋，請按「重新整理」後再存", kind: "err" }; render(); window.scrollTo(0, 0); return; }
     const v = {
+      ...S.sched.settings,   // 保留人員顏色等其他設定
       start: String(f.get("start") || SCHED_DEFAULTS.start),
       end: String(f.get("end") || SCHED_DEFAULTS.end),
       breakMin: Math.max(0, Number(f.get("breakMin")) || 0),
