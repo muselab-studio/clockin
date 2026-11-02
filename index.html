@@ -110,6 +110,12 @@ tfoot td{font-weight:700;border-bottom:0}
 .sc.flag::before{content:"!";font-weight:700;color:var(--bad);margin-right:3px}
 .sc .t{opacity:.75}
 .sc.off{background:transparent;color:var(--muted);border:1px dashed var(--muted);padding:1px 4px}
+/* 拖曳班次 */
+.cal [data-sid]{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.cal .day.drop-over{border:2px dashed var(--accent);padding:4px;background:var(--soft)}
+.sc.dragging{opacity:.35}
+.sc.ghost{position:fixed;left:0;top:0;z-index:70;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+body.is-dragging,body.is-dragging *{cursor:grabbing!important;user-select:none}
 .picks button:disabled{opacity:.4;cursor:not-allowed}
 .more{font-size:11px;color:var(--muted)}
 .dotname{--pc:#857d74;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;flex:none;font-weight:700;font-size:13px;
@@ -471,6 +477,7 @@ const S = {
   adminTab: "attendance", sched: null, day: null, schedMsg: null,
   crew: null, offToday: [], myUpcoming: [], crewErr: null,
   colors: {},   // uid -> 顏色（存在 meta/schedule 的 colors）
+  dropAsk: null,   // 拖曳班次放開後，詢問複製還是移動 { s, to, note }
   staffCal: { month: fmtMonth(new Date()), list: null, sel: fmtDate(new Date()), err: null },   // 前台月班表
 };
 const app = document.getElementById("app");
@@ -736,7 +743,8 @@ function viewAdmin() {
     ${msg ? `<div class="msg ${msg.kind}" style="margin:0 0 12px">${esc(msg.text)}</div>` : ""}
     ${body}
   </div>
-  ${isSched && S.day ? viewDayModal() : ""}`;
+  ${isSched && S.day ? viewDayModal() : ""}
+  ${isSched && S.dropAsk ? viewDropModal() : ""}`;
 }
 
 function viewSummary(A) {
@@ -810,7 +818,7 @@ function viewSchedule() {
       if (isLeave(s)) return `<div class="sc off" title="${esc(`${name} ${leaveLabel(s)}`)}">休 ${esc(name)} <span class="t">${esc(leaveLabel(s))}</span></div>`;
       const fl = dayFlags[s.uid + "|" + k];
       const tip = `${name} ${shiftLabel(s)}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
-      return `<div class="sc${fl ? " flag" : ""}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
+      return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}" data-act="sday" data-v="${k}">
       <div class="dnum">${d.getDate()}${shifts.length ? `<span>${shifts.length} 人</span>` : ""}</div>
@@ -829,7 +837,7 @@ function viewSchedule() {
     </div>
     ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
     <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
+    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
   ${viewSchedColors()}
@@ -1015,6 +1023,33 @@ function viewDayModal() {
         ${editing ? `<button class="btn" data-act="scancel">取消修改</button>` : ""}
         <button class="btn" data-act="sclose">關閉</button>
       </div>
+    </div>
+  </div>`;
+}
+
+/* 拖曳放開後：問要複製還是移動 */
+function viewDropModal() {
+  const { s, to, note } = S.dropAsk;
+  const name = schedName(s);
+  return `
+  <div class="modal-bg" data-close="1">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:420px">
+      <h2 style="margin:0 0 12px">要複製還是移動？</h2>
+      <div class="rowl">
+        <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
+        <span class="who"><b>${esc(name)}</b><span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分</span></span>
+      </div>
+      <p style="margin:14px 0 4px;font-size:16px">${dayLabel(s.date)}　→　<b>${dayLabel(to)}</b></p>
+      ${note ? `<div class="msg err" style="margin-top:8px">${esc(note)}，繼續的話這天會有兩個班。</div>` : ""}
+      <div class="small muted" style="margin-top:10px;line-height:1.7">
+        <b>複製</b>：${dayLabel(s.date)} 的班保留，${dayLabel(to)} 再加一個一樣的班<br>
+        <b>移動</b>：班改到 ${dayLabel(to)}，${dayLabel(s.date)} 就沒有這個班了
+      </div>
+      <div class="btnrow">
+        <button class="btn" data-act="dropdo" data-v="copy" ${S.busy ? "disabled" : ""}>複製</button>
+        <button class="btn primary" data-act="dropdo" data-v="move" ${S.busy ? "disabled" : ""}>移動</button>
+      </div>
+      <button class="btn block" data-act="dropcancel" style="margin-top:8px">取消</button>
     </div>
   </div>`;
 }
@@ -1210,16 +1245,122 @@ async function afterLogin() {
   }
 }
 
+/* ---------- 排班表：拖曳班次到別天 ----------
+   電腦：按住滑鼠拖；手機：長按 0.35 秒後再拖（不長按就是一般捲動）。
+   放開在另一天就跳出「複製／移動」。拖曳中不重畫畫面，結束後才更新。 */
+const drag = { s: null, active: false, ghost: null, over: null, x0: 0, y0: 0, x: 0, y: 0, timer: null, suppress: false };
+
+function dragStart(chip, x, y) {
+  if (S.me?.role !== "admin" || S.adminTab !== "schedule" || S.busy || S.day || S.dropAsk) return false;
+  const s = S.sched?.list.find(it => it.id === chip.dataset.sid && !isLeave(it));
+  if (!s) return false;
+  Object.assign(drag, { s, chip, active: false, x0: x, y0: y, x, y });
+  return true;
+}
+function dragBegin() {
+  drag.active = true;
+  const r = drag.chip.getBoundingClientRect();
+  const g = drag.chip.cloneNode(true);
+  g.classList.add("ghost"); g.classList.remove("flag");
+  g.style.width = Math.max(r.width, 90) + "px";
+  document.body.appendChild(g);
+  drag.ghost = g;
+  drag.chip.classList.add("dragging");
+  document.body.classList.add("is-dragging");
+  dragMove(drag.x, drag.y);
+}
+function dragMove(x, y) {
+  drag.x = x; drag.y = y;
+  if (!drag.active) return;
+  drag.ghost.style.transform = `translate(${x + 10}px, ${y + 10}px)`;
+  const day = document.elementFromPoint(x, y)?.closest(".cal .day[data-v]") || null;
+  if (day !== drag.over) { drag.over?.classList.remove("drop-over"); drag.over = day; day?.classList.add("drop-over"); }
+}
+function dragEnd(cancel = false) {
+  clearTimeout(drag.timer);
+  const { s, active, over } = drag;
+  drag.ghost?.remove(); over?.classList.remove("drop-over"); drag.chip?.classList.remove("dragging");
+  document.body.classList.remove("is-dragging");
+  Object.assign(drag, { s: null, chip: null, active: false, ghost: null, over: null, timer: null });
+  if (!active) return;
+  drag.suppress = true; setTimeout(() => { drag.suppress = false; }, 400);   // 放開時不要順便打開那天的視窗
+  const to = over?.dataset.v;
+  if (cancel || !s || !to || to === s.date) return;
+  askDrop(s, to);
+}
+function askDrop(s, to) {
+  const list = S.sched.list;
+  if (list.some(x => x.date === to && x.uid === s.uid && isLeave(x))) {
+    S.schedMsg = { text: `${schedName(s)} ${dayLabel(to)} 休假，不能排班（要排請先取消休假）`, kind: "err" };
+    render(); return;
+  }
+  const same = shiftsOnly(list).filter(x => x.date === to && x.uid === s.uid);
+  S.schedMsg = null;
+  S.dropAsk = { s, to, note: same.length ? `${schedName(s)} ${dayLabel(to)} 已經有 ${same.map(shiftLabel).join("、")} 的班` : "" };
+  render();
+}
+
+// 滑鼠
+app.addEventListener("pointerdown", e => {
+  if (e.pointerType !== "mouse" || e.button !== 0) return;
+  const chip = e.target.closest(".cal [data-sid]");
+  if (chip && dragStart(chip, e.clientX, e.clientY)) e.preventDefault();   // 避免拖的時候選到文字
+});
+window.addEventListener("pointermove", e => {
+  if (!drag.s || e.pointerType !== "mouse") return;
+  if (!drag.active && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 5) { drag.x = e.clientX; drag.y = e.clientY; dragBegin(); }
+  dragMove(e.clientX, e.clientY);
+});
+window.addEventListener("pointerup", e => { if (drag.s && e.pointerType === "mouse") { dragMove(e.clientX, e.clientY); dragEnd(); } });
+window.addEventListener("keydown", e => { if (e.key === "Escape" && drag.active) dragEnd(true); });
+
+// 手機：長按才開始拖
+app.addEventListener("touchstart", e => {
+  if (e.touches.length !== 1) return;
+  const chip = e.target.closest(".cal [data-sid]");
+  const t = e.touches[0];
+  if (!chip || !dragStart(chip, t.clientX, t.clientY)) return;
+  drag.timer = setTimeout(() => { if (drag.s) { dragBegin(); navigator.vibrate?.(15); } }, 350);
+}, { passive: true });
+window.addEventListener("touchmove", e => {
+  if (!drag.s) return;
+  const t = e.touches[0];
+  if (!drag.active) {   // 還沒長按就移動 = 在捲動畫面，取消拖曳
+    if (Math.hypot(t.clientX - drag.x0, t.clientY - drag.y0) > 10) dragEnd(true);
+    return;
+  }
+  e.preventDefault();
+  dragMove(t.clientX, t.clientY);
+}, { passive: false });
+window.addEventListener("touchend", e => { if (!drag.s) return; if (drag.active) e.preventDefault(); dragEnd(); });
+window.addEventListener("touchcancel", () => { if (drag.s) dragEnd(true); });
+window.addEventListener("contextmenu", e => { if (drag.s) e.preventDefault(); });   // 長按時不要跳出系統選單
+
 app.addEventListener("click", async e => {
-  // 點排班視窗外面的灰色區域就關閉
-  if (e.target.matches?.(".modal-bg[data-close]")) { S.day = null; render(); return; }
+  // 剛拖完放開時瀏覽器會補一個點擊，擋掉它以免打開那天的視窗；但視窗裡的按鈕照常可以按
+  if (drag.suppress && !e.target.closest(".modal")) { drag.suppress = false; e.preventDefault(); return; }
+  // 點視窗外面的灰色區域就關閉
+  if (e.target.matches?.(".modal-bg[data-close]")) { S.day = null; S.dropAsk = null; render(); return; }
   const el = e.target.closest("[data-act]");
   if (!el) return;
   const act = el.dataset.act, v = el.dataset.v;
 
   /* ----- 排班 ----- */
+  if (act === "dropcancel") { S.dropAsk = null; render(); return; }
+  if (act === "dropdo") {
+    if (!S.dropAsk || S.busy) return;
+    const { s, to } = S.dropAsk;
+    S.busy = true; render();
+    try {
+      if (v === "move") await S.store.updateSchedule(s.id, { date: to });
+      else await S.store.addSchedules([{ uid: s.uid, name: staffName(s.uid) || s.name || "", date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0 }]);
+      await refreshSchedList();
+      S.schedMsg = { text: `已${v === "move" ? "移動" : "複製"}：${schedName(s)} ${shiftLabel(s)}，${dayLabel(s.date)} → ${dayLabel(to)}`, kind: "ok" };
+    } catch (err) { S.schedMsg = { text: `${v === "move" ? "移動" : "複製"}失敗：` + (err.message || err) + RULES_HINT, kind: "err" }; }
+    S.dropAsk = null; S.busy = false; render(); return;
+  }
   if (act === "atab") {
-    S.adminTab = v; S.schedMsg = null; S.adminMsg = null; S.day = null;
+    S.adminTab = v; S.schedMsg = null; S.adminMsg = null; S.day = null; S.dropAsk = null;
     if (v === "schedule") { S.selected = null; await loadSchedule(); }
     else if (!S.admin || S.admin.month !== S.month) await loadAdmin();
     else render();
@@ -1274,7 +1415,7 @@ app.addEventListener("click", async e => {
 
   if (act === "role") { S.role = v; setMsg(null); if (v === "admin") await refreshAdminLeft(); render(); }
   else if (act === "mode") { S.mode = v; setMsg(null); if (S.role === "admin") await refreshAdminLeft(); render(); }
-  else if (act === "logout") { await S.store.signOut(); S.me = null; S.mine = []; S.admin = null; S.adminMsg = null; S.sched = null; S.day = null; S.schedMsg = null; S.crew = null; S.myUpcoming = []; S.colors = {}; S.mode = "signin"; setMsg(null); render(); }
+  else if (act === "logout") { await S.store.signOut(); S.me = null; S.mine = []; S.admin = null; S.adminMsg = null; S.sched = null; S.day = null; S.schedMsg = null; S.crew = null; S.myUpcoming = []; S.colors = {}; S.dropAsk = null; S.mode = "signin"; setMsg(null); render(); }
   else if (act === "punch") {
     if (S.busy) return;
     S.busy = true; setMsg(null); render();
