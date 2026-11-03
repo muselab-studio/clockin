@@ -110,6 +110,12 @@ tfoot td{font-weight:700;border-bottom:0}
 .sc.flag::before{content:"!";font-weight:700;color:var(--bad);margin-right:3px}
 .sc .t{opacity:.75}
 .sc.off{background:transparent;color:var(--muted);border:1px dashed var(--muted);padding:1px 4px}
+/* 居家上班：班前面加小房子圖示 */
+.ico-home{width:11px;height:11px;vertical-align:-1px;margin-right:2px}
+.pill.home{background:var(--soft);color:var(--accent)}
+.pill.home .ico-home{width:12px;height:12px;margin-right:3px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:14px 0 0;cursor:pointer;width:fit-content}
+.check input{width:18px;height:18px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
 /* 拖曳班次 */
 .cal [data-sid]{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .cal .day.drop-over{border:2px dashed var(--accent);padding:4px;background:var(--soft)}
@@ -234,6 +240,11 @@ const isLeave = s => s.kind === "leave";
 const shiftsOnly = list => list.filter(s => !isLeave(s));
 const leavesOnly = list => list.filter(isLeave);
 const leaveLabel = s => s.leaveType || "休假";
+// 居家上班：班多一個 remote: true
+const isRemote = s => !isLeave(s) && !!s.remote;
+const HOME_ICON = `<svg class="ico-home" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2 .8 7.4h2.2V14.8h3.9v-4.3h2.2v4.3h3.9V7.4h2.2z" fill="currentColor"/></svg>`;
+const homeIcon = s => isRemote(s) ? HOME_ICON : "";
+const homePill = s => isRemote(s) ? ` <span class="pill home">${HOME_ICON}居家</span>` : "";
 // 月曆一頁從週一排到週日
 function gridRange(month) {
   const [y, m] = month.split("-").map(Number);
@@ -406,7 +417,7 @@ async function makeFirebaseStore(cfg) {
     async schedulesBetween(from, to) {
       try {
         const q = F.query(schedCol, F.where("date", ">=", from), F.where("date", "<=", to));
-        return (await F.getDocs(q)).docs.map(s => { const d = s.data(); return { id: s.id, uid: d.uid, name: d.name || "", date: d.date, kind: d.kind || "shift", leaveType: d.leaveType || "", start: d.start || "", end: d.end || "", breakMin: d.breakMin || 0 }; });
+        return (await F.getDocs(q)).docs.map(s => { const d = s.data(); return { id: s.id, uid: d.uid, name: d.name || "", date: d.date, kind: d.kind || "shift", leaveType: d.leaveType || "", start: d.start || "", end: d.end || "", breakMin: d.breakMin || 0, remote: !!d.remote }; });
       } catch (e) { throw mapErr(e); }
     },
     // 新增多筆（班或休假）；delIds 是要一起刪掉的舊資料（例如設休假時刪掉當天的班），一次寫入
@@ -591,7 +602,7 @@ function viewStaffCal() {
       const me = s.uid === S.me.uid ? " me" : "";
       return isLeave(s)
         ? `<div class="sc off${me}">休 ${name}</div>`
-        : `<div class="sc${me}" style="--pc:${pcolor(s.uid)}">${name} <span class="t">${s.start}–${s.end}</span></div>`;
+        : `<div class="sc${me}" style="--pc:${pcolor(s.uid)}"${isRemote(s) ? ` title="居家上班"` : ""}>${homeIcon(s)}${name} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}${k === C.sel ? " sel" : ""}" data-act="cday" data-v="${k}">
       <div class="dnum">${d.getDate()}${nWork ? `<span>${nWork} 人</span>` : ""}</div>
@@ -606,7 +617,7 @@ function viewStaffCal() {
       <h2 style="font-size:15px;margin:0 0 4px">${dayLabel(C.sel)}${C.sel === today ? "・今天" : ""}</h2>
       ${selWork.length ? `<ul class="list">${selWork.map(s => `<li><span class="rowl who">
           <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
-          <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}</span></span>
+          <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}${homePill(s)}</span></span>
           <b>${shiftLabel(s)}</b></li>`).join("")}</ul>` : `<div class="small muted" style="padding:8px 0">這天沒有人排班</div>`}
       ${selOff.length ? `<div class="small muted" style="margin-top:6px">休假：${selOff.map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}（${esc(leaveLabel(s))}）`).join("、")}</div>` : ""}
     </div>`;
@@ -622,7 +633,7 @@ function viewStaffCal() {
     </div>
     ${C.err ? `<div class="empty">${esc(C.err)}</div>` : !C.list ? `<div class="empty">讀取中…</div>` : `
       <div class="cal compact">${cells}</div>
-      <p class="small muted" style="margin:8px 0 0">點任一天可以看那天誰上班、幾點到幾點。粗框是你自己的班。</p>
+      <p class="small muted" style="margin:8px 0 0">點任一天可以看那天誰上班、幾點到幾點。粗框是你自己的班，有小房子的是居家上班。</p>
       ${detail}`}
   </div>`;
 }
@@ -637,7 +648,7 @@ function viewCrew() {
     : !crew.length ? `<div class="empty">今天沒有排班</div>`
     : `<ul class="list">${crew.map(s => `<li><span class="rowl who">
         <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
-        <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}</span></span>
+        <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}${homePill(s)}</span></span>
         <b>${shiftLabel(s)}</b></li>`).join("")}</ul>`;
   const off = (S.offToday || []).map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}`);
   return `
@@ -646,7 +657,7 @@ function viewCrew() {
     ${crewHtml}
     ${off.length ? `<div class="small muted" style="margin-top:10px">今天休假：${off.join("、")}</div>` : ""}
     ${upcoming.length ? `<h2 style="font-size:15px;margin:18px 0 4px">我接下來的班</h2>
-      <ul class="list">${upcoming.map(s => `<li><span>${dayLabel(s.date)}</span>${isLeave(s) ? `<span class="pill off">${esc(leaveLabel(s))}</span>` : `<b>${shiftLabel(s)}</b>`}</li>`).join("")}</ul>` : ""}
+      <ul class="list">${upcoming.map(s => `<li><span>${dayLabel(s.date)}</span>${isLeave(s) ? `<span class="pill off">${esc(leaveLabel(s))}</span>` : `<span>${homePill(s)} <b>${shiftLabel(s)}</b></span>`}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
 
@@ -817,8 +828,8 @@ function viewSchedule() {
       const name = schedName(s);
       if (isLeave(s)) return `<div class="sc off" title="${esc(`${name} ${leaveLabel(s)}`)}">休 ${esc(name)} <span class="t">${esc(leaveLabel(s))}</span></div>`;
       const fl = dayFlags[s.uid + "|" + k];
-      const tip = `${name} ${shiftLabel(s)}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
-      return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
+      const tip = `${name} ${shiftLabel(s)}${isRemote(s) ? "（居家）" : ""}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
+      return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${homeIcon(s)}${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}" data-act="sday" data-v="${k}">
       <div class="dnum">${d.getDate()}${shifts.length ? `<span>${shifts.length} 人</span>` : ""}</div>
@@ -837,7 +848,7 @@ function viewSchedule() {
     </div>
     ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
     <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
+    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
   ${viewSchedColors()}
@@ -868,12 +879,12 @@ function viewSchedSummary() {
   const mFrom = fmtDate(first), mTo = fmtDate(last);
   const { dayFlags, cycleFlags } = analyzeSchedule(P.list, P.settings);
   const stats = {};
-  const ensure = uid => (stats[uid] ??= { days: new Set(), hours: 0, off: new Set() });
+  const ensure = uid => (stats[uid] ??= { days: new Set(), hours: 0, off: new Set(), home: new Set() });
   P.staff.forEach(u => ensure(u.uid));
   for (const s of P.list) if (s.date >= mFrom && s.date <= mTo) {
     const st = ensure(s.uid);
     if (isLeave(s)) { st.off.add(s.date); continue; }
-    st.days.add(s.date); st.hours += shiftHours(s);
+    st.days.add(s.date); st.hours += shiftHours(s); if (isRemote(s)) st.home.add(s.date);
   }
   const uids = Object.keys(stats);
   if (!uids.length) return `<div class="card" style="margin-top:16px"><div class="empty">還沒有員工帳號。請員工到前台「申請員工帳號」，申請後就能排班。</div></div>`;
@@ -890,7 +901,7 @@ function viewSchedSummary() {
   warns.forEach(w => wc[w.uid] = (wc[w.uid] || 0) + 1);
 
   const actual = Object.fromEntries((P.rows || []).map(r => [r.user.uid, r.work]));
-  const rows = uids.map(uid => ({ uid, name: schedName({ uid }), days: stats[uid].days.size, off: stats[uid].off.size, hours: stats[uid].hours, actual: actual[uid] }))
+  const rows = uids.map(uid => ({ uid, name: schedName({ uid }), days: stats[uid].days.size, home: stats[uid].home.size, off: stats[uid].off.size, hours: stats[uid].hours, actual: actual[uid] }))
     .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, "zh-Hant"));
   const tot = rows.reduce((a, r) => ({ days: a.days + r.days, off: a.off + r.off, hours: a.hours + r.hours, actual: a.actual + (r.actual || 0) }), { days: 0, off: 0, hours: 0, actual: 0 });
   return `
@@ -900,7 +911,7 @@ function viewSchedSummary() {
       <thead><tr><th>姓名</th><th class="right">排班天數</th><th class="right">休假天數</th><th class="right">排班時數</th><th class="right">實際工時</th><th class="right">提醒</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <td><span class="sc" style="--pc:${pcolor(r.uid)};display:inline-block;font-size:13px">${esc(r.name)}</span></td>
-        <td class="right">${r.days}</td><td class="right">${r.off || `<span class="muted">—</span>`}</td><td class="right"><b>${fmtH(r.hours)}</b></td>
+        <td class="right">${r.days}${r.home ? `<span class="small muted">（居家 ${r.home}）</span>` : ""}</td><td class="right">${r.off || `<span class="muted">—</span>`}</td><td class="right"><b>${fmtH(r.hours)}</b></td>
         <td class="right">${r.actual == null ? `<span class="muted">—</span>` : toHours(r.actual)}</td>
         <td class="right">${wc[r.uid] ? `<span class="pill bad">${wc[r.uid]}</span>` : `<span class="muted">—</span>`}</td></tr>`).join("")}
       </tbody>
@@ -985,6 +996,7 @@ function viewDayModal() {
         <label>休息時間（分鐘，不算工時）</label>
         <input type="number" name="breakMin" min="0" step="5" value="${Number(D.form.breakMin) || 0}">
         <button type="button" class="btn sm" data-act="sdefault" style="margin-top:8px">套用預設時間</button>
+        <label class="check"><input type="checkbox" name="remote" ${D.form.remote ? "checked" : ""}> 居家上班</label>
         <div class="calc" id="sCalc">${calcLine(D.form)}</div>
         ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
         <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : editing ? "儲存修改" : "加入班表"}</button>
@@ -998,7 +1010,7 @@ function viewDayModal() {
         const name = schedName(s);
         return `<li><span class="rowl who">
             <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-            <span class="who"><b>${esc(name)}</b>
+            <span class="who"><b>${esc(name)}</b>${homePill(s)}
               <span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分・排 ${fmtH(shiftHours(s))} 小時</span>
               ${fl ? `<span class="small" style="color:var(--bad)">${fl.map(esc).join("<br>")}</span>` : ""}</span></span>
           <span style="display:flex;gap:6px;flex:none">
@@ -1037,7 +1049,7 @@ function viewDropModal() {
       <h2 style="margin:0 0 12px">要複製還是移動？</h2>
       <div class="rowl">
         <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-        <span class="who"><b>${esc(name)}</b><span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分</span></span>
+        <span class="who"><b>${esc(name)}</b>${homePill(s)}<span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分</span></span>
       </div>
       <p style="margin:14px 0 4px;font-size:16px">${dayLabel(s.date)}　→　<b>${dayLabel(to)}</b></p>
       ${note ? `<div class="msg err" style="margin-top:8px">${esc(note)}，繼續的話這天會有兩個班。</div>` : ""}
@@ -1189,10 +1201,10 @@ async function saveColor(uid, hex) {
 function openDay(date, editId = null, mode = "shift") {
   const st = S.sched.settings;
   const leaveType = S.day?.leaveType || LEAVE_TYPES[0];
-  S.day = { date, mode, leaveType, editId: null, pick: new Set(), form: { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0 }, msg: null };
+  S.day = { date, mode, leaveType, editId: null, pick: new Set(), form: { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0, remote: false }, msg: null };
   if (editId) {
     const s = S.sched.list.find(x => x.id === editId);
-    if (s) Object.assign(S.day, { editId, pick: new Set([s.uid]), form: { start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0 } });
+    if (s) Object.assign(S.day, { editId, pick: new Set([s.uid]), form: { start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote } });
   }
 }
 
@@ -1353,7 +1365,7 @@ app.addEventListener("click", async e => {
     S.busy = true; render();
     try {
       if (v === "move") await S.store.updateSchedule(s.id, { date: to });
-      else await S.store.addSchedules([{ uid: s.uid, name: staffName(s.uid) || s.name || "", date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0 }]);
+      else await S.store.addSchedules([{ uid: s.uid, name: staffName(s.uid) || s.name || "", date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote }]);
       await refreshSchedList();
       S.schedMsg = { text: `已${v === "move" ? "移動" : "複製"}：${schedName(s)} ${shiftLabel(s)}，${dayLabel(s.date)} → ${dayLabel(to)}`, kind: "ok" };
     } catch (err) { S.schedMsg = { text: `${v === "move" ? "移動" : "複製"}失敗：` + (err.message || err) + RULES_HINT, kind: "err" }; }
@@ -1396,7 +1408,7 @@ app.addEventListener("click", async e => {
   }
   if (act === "sdefault") {
     const st = S.sched.settings;
-    S.day.form = { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0 }; render(); return;
+    S.day.form = { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0, remote: !!S.day.form.remote }; render(); return;
   }
   if (act === "sdel") {
     const s = S.sched.list.find(x => x.id === v);
@@ -1458,6 +1470,7 @@ app.addEventListener("input", e => {
   if (e.target.dataset?.color) { const chip = e.target.nextElementSibling; if (chip) chip.style.setProperty("--pc", e.target.value); return; }
   if (form?.id !== "schedForm" || !S.day || !e.target.name) return;
   if (e.target.name === "leaveType") { S.day.leaveType = e.target.value; return; }
+  if (e.target.type === "checkbox") { S.day.form[e.target.name] = e.target.checked; return; }
   S.day.form[e.target.name] = e.target.name === "breakMin" ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
   const c = document.getElementById("sCalc");
   if (c) c.innerHTML = calcLine(S.day.form);
@@ -1494,7 +1507,7 @@ app.addEventListener("submit", async e => {
 
   if (e.target.id === "schedForm") {
     const D = S.day;
-    const fm = { start: String(f.get("start") || ""), end: String(f.get("end") || ""), breakMin: Math.max(0, Number(f.get("breakMin")) || 0) };
+    const fm = { start: String(f.get("start") || ""), end: String(f.get("end") || ""), breakMin: Math.max(0, Number(f.get("breakMin")) || 0), remote: f.get("remote") === "on" };
     D.form = fm;
     const fail = t => { D.msg = { text: t, kind: "err" }; render(); };
     if (!D.pick.size) return fail("請選擇至少一位人員");
@@ -1516,7 +1529,7 @@ app.addEventListener("submit", async e => {
       const wasEdit = !!D.editId;
       await refreshSchedList();
       openDay(D.date);
-      S.day.msg = { text: `${wasEdit ? "已更新" : "已加入"}：${who} ${shiftLabel(fm)}`, kind: "ok" };
+      S.day.msg = { text: `${wasEdit ? "已更新" : "已加入"}：${who} ${shiftLabel(fm)}${fm.remote ? "（居家）" : ""}`, kind: "ok" };
     } catch (err) { D.msg = { text: "儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
     S.busy = false; render();
     return;
