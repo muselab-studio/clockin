@@ -114,6 +114,18 @@ tfoot td{font-weight:700;border-bottom:0}
 .ico-home{width:11px;height:11px;vertical-align:-1px;margin-right:2px}
 .pill.home{background:var(--soft);color:var(--accent)}
 .pill.home .ico-home{width:12px;height:12px;margin-right:3px}
+/* 24 小時制時間選擇（時、分兩個下拉） */
+.tp{display:flex;align-items:center;gap:4px}
+.tp select{width:auto;flex:1;min-width:0;padding:10px 8px;font-variant-numeric:tabular-nums}
+.tp span{color:var(--muted);font-weight:700}
+/* 月曆上方：每個人的班表開關 */
+.pfilter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
+.pfilter button{--pc:#857d74;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
+.pfilter button .sw{width:10px;height:10px;border-radius:50%;border:2px solid var(--pc);flex:none}
+.pfilter button.on{color:var(--ink);border-color:color-mix(in srgb,var(--pc) 45%,var(--line));background:color-mix(in srgb,var(--pc) 12%,var(--card))}
+.pfilter button.on .sw{background:var(--pc)}
+.pfilter button.off-name span{text-decoration:line-through}
+.pfilter button.ctl{color:var(--accent);border-style:dashed}
 .check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:14px 0 0;cursor:pointer;width:fit-content}
 .check input{width:18px;height:18px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
 /* 拖曳班次 */
@@ -489,6 +501,7 @@ const S = {
   crew: null, offToday: [], myUpcoming: [], crewErr: null,
   colors: {},   // uid -> 顏色（存在 meta/schedule 的 colors）
   dropAsk: null,   // 拖曳班次放開後，詢問複製還是移動 { s, to, note }
+  calHide: { admin: new Set(), staff: new Set() },   // 月曆上暫時關掉不看的人（各自存在自己的瀏覽器）
   staffCal: { month: fmtMonth(new Date()), list: null, sel: fmtDate(new Date()), err: null },   // 前台月班表
 };
 const app = document.getElementById("app");
@@ -584,13 +597,51 @@ function viewStaff() {
 }
 
 /* 前台：今天上班的人員 + 我接下來的班 */
+/* 24 小時制時間選擇：時（00–23）、分（每 5 分鐘）兩個下拉，實際值放在同名的隱藏欄位 */
+function timePicker(name, value) {
+  const [h, m] = /^\d{2}:\d{2}$/.test(value || "") ? value.split(":") : ["09", "30"];
+  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
+  const mins = Array.from({ length: 12 }, (_, i) => pad(i * 5));
+  if (!mins.includes(m)) { mins.push(m); mins.sort(); }   // 舊資料不是 5 分鐘整數也保留
+  const opts = (arr, cur) => arr.map(v => `<option${v === cur ? " selected" : ""}>${v}</option>`).join("");
+  return `<div class="tp">
+    <select data-tp="h" aria-label="時">${opts(hours, h)}</select><span>:</span>
+    <select data-tp="m" aria-label="分">${opts(mins, m)}</select>
+    <input type="hidden" name="${name}" value="${h}:${m}">
+  </div>`;
+}
+
+/* 月曆上方的人員開關：點名字隱藏／顯示那個人的班（只影響自己看到的畫面） */
+const hideKey = where => `clockin_hide_${where}_${S.me?.uid || ""}`;
+function loadHidden(where) { try { return new Set(JSON.parse(localStorage.getItem(hideKey(where)) || "[]")); } catch { return new Set(); } }
+function saveHidden(where) { try { localStorage.setItem(hideKey(where), JSON.stringify([...S.calHide[where]])); } catch {} }
+function viewPeopleFilter(where, people) {
+  if (!people.length) return "";
+  const hid = S.calHide[where];
+  const nHidden = people.filter(p => hid.has(p.uid)).length;
+  return `<div class="pfilter">
+    ${people.map(p => {
+      const on = !hid.has(p.uid);
+      return `<button type="button" data-act="pf" data-w="${where}" data-v="${esc(p.uid)}" class="${on ? "on" : "off-name"}" style="--pc:${pcolor(p.uid)}" aria-pressed="${on}" title="${on ? "點一下隱藏" : "點一下顯示"}"><i class="sw"></i><span>${esc(p.name)}</span></button>`;
+    }).join("")}
+    ${where === "staff" ? `<button type="button" class="ctl" data-act="pf" data-w="staff" data-v="__me">只看我</button>` : ""}
+    ${nHidden ? `<button type="button" class="ctl" data-act="pf" data-w="${where}" data-v="__all">全部顯示</button>` : ""}
+  </div>`;
+}
+
 /* 前台：整個月的班表（只能看，不能改） */
 function viewStaffCal() {
   const C = S.staffCal;
   const { first, gridStart, gridEnd } = gridRange(C.month);
   const today = fmtDate(new Date());
   const byDate = {};
-  for (const s of C.list || []) (byDate[s.date] ??= []).push(s);
+  const hid = S.calHide.staff;
+  for (const s of C.list || []) if (!hid.has(s.uid)) (byDate[s.date] ??= []).push(s);
+  // 開關列：本月有出現的人（自己排第一個）
+  const seen = new Map();
+  for (const s of [...(C.list || [])].sort((a, b) => (a.uid === S.me.uid ? -1 : b.uid === S.me.uid ? 1 : (a.name || "").localeCompare(b.name || "", "zh-Hant"))))
+    if (!seen.has(s.uid)) seen.set(s.uid, { uid: s.uid, name: s.name || "（未知）" });
+  if (!seen.has(S.me.uid)) seen.set(S.me.uid, { uid: S.me.uid, name: S.me.displayName });
   const sortDay = arr => [...shiftsOnly(arr).sort(byStart), ...leavesOnly(arr).sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"))];
   let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
@@ -632,6 +683,7 @@ function viewStaffCal() {
       </div>
     </div>
     ${C.err ? `<div class="empty">${esc(C.err)}</div>` : !C.list ? `<div class="empty">讀取中…</div>` : `
+      ${viewPeopleFilter("staff", [...seen.values()])}
       <div class="cal compact">${cells}</div>
       <p class="small muted" style="margin:8px 0 0">點任一天可以看那天誰上班、幾點到幾點。粗框是你自己的班，有小房子的是居家上班。</p>
       ${detail}`}
@@ -817,7 +869,7 @@ function viewSchedule() {
   const { dayFlags } = analyzeSchedule(P.list, P.settings);
   const today = fmtDate(new Date());
   const byDate = {};
-  for (const s of P.list) (byDate[s.date] ??= []).push(s);
+  for (const s of P.list) if (!S.calHide.admin.has(s.uid)) (byDate[s.date] ??= []).push(s);
   let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
     const k = fmtDate(d);
@@ -847,6 +899,7 @@ function viewSchedule() {
       </div>
     </div>
     ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
+    ${viewPeopleFilter("admin", P.staff.map(u => ({ uid: u.uid, name: u.displayName })))}
     <div class="cal">${cells}</div>
     <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
@@ -930,8 +983,8 @@ function viewSchedSettings() {
     <div class="small muted">新增班時會先帶入這組時間，每個班都還可以再改。</div>
     <form id="schedSetForm">
       <div class="two">
-        <div><label>預設上班時間</label><input type="time" name="start" value="${esc(st.start)}" required></div>
-        <div><label>預設下班時間</label><input type="time" name="end" value="${esc(st.end)}" required></div>
+        <div><label>預設上班時間</label>${timePicker("start", st.start)}</div>
+        <div><label>預設下班時間</label>${timePicker("end", st.end)}</div>
       </div>
       <label>預設休息時間（分鐘）</label>
       <input type="number" name="breakMin" min="0" step="5" value="${Number(st.breakMin) || 0}">
@@ -990,8 +1043,8 @@ function viewDayModal() {
         <label>${editing ? "人員" : "人員（可複選）"}</label>
         ${picks}
         <div class="two">
-          <div><label>上班時間</label><input type="time" name="start" value="${esc(D.form.start)}" required></div>
-          <div><label>下班時間</label><input type="time" name="end" value="${esc(D.form.end)}" required></div>
+          <div><label>上班時間</label>${timePicker("start", D.form.start)}</div>
+          <div><label>下班時間</label>${timePicker("end", D.form.end)}</div>
         </div>
         <label>休息時間（分鐘，不算工時）</label>
         <input type="number" name="breakMin" min="0" step="5" value="${Number(D.form.breakMin) || 0}">
@@ -1249,6 +1302,7 @@ async function refreshAdminLeft() {
 
 async function afterLogin() {
   setMsg(null);
+  S.calHide = { admin: loadHidden("admin"), staff: loadHidden("staff") };
   if (S.me.role === "admin") { S.selected = null; S.open.clear(); S.day = null; await (S.adminTab === "schedule" ? loadSchedule() : loadAdmin()); }
   else {
     S.open.clear(); S.myMonth = fmtMonth(new Date()); S.myShifts = null; S.fixMsg = null;
@@ -1358,6 +1412,13 @@ app.addEventListener("click", async e => {
   const act = el.dataset.act, v = el.dataset.v;
 
   /* ----- 排班 ----- */
+  if (act === "pf") {   // 月曆人員開關
+    const w = el.dataset.w, hid = S.calHide[w];
+    if (v === "__all") hid.clear();
+    else if (v === "__me") { hid.clear(); for (const s of S.staffCal.list || []) if (s.uid !== S.me.uid) hid.add(s.uid); }
+    else hid.has(v) ? hid.delete(v) : hid.add(v);
+    saveHidden(w); render(); return;
+  }
   if (act === "dropcancel") { S.dropAsk = null; render(); return; }
   if (act === "dropdo") {
     if (!S.dropAsk || S.busy) return;
@@ -1468,6 +1529,14 @@ app.addEventListener("input", e => {
   const form = e.target.form;
   // 拖動色盤時先即時預覽旁邊的名字，放開（change）才存檔
   if (e.target.dataset?.color) { const chip = e.target.nextElementSibling; if (chip) chip.style.setProperty("--pc", e.target.value); return; }
+  if (e.target.dataset?.tp) {   // 時／分下拉：組成 HH:MM 放進隱藏欄位
+    const wrap = e.target.closest(".tp");
+    const [hs, ms] = wrap.querySelectorAll("select");
+    const hidden = wrap.querySelector("input[type=hidden]");
+    hidden.value = `${hs.value}:${ms.value}`;
+    if (form?.id === "schedForm" && S.day) { S.day.form[hidden.name] = hidden.value; const c = document.getElementById("sCalc"); if (c) c.innerHTML = calcLine(S.day.form); }
+    return;
+  }
   if (form?.id !== "schedForm" || !S.day || !e.target.name) return;
   if (e.target.name === "leaveType") { S.day.leaveType = e.target.value; return; }
   if (e.target.type === "checkbox") { S.day.form[e.target.name] = e.target.checked; return; }
