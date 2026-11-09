@@ -2,191 +2,857 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>員工打卡系統</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>如梭記帳</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
+/* 版面沿用如梭打卡系統：同樣的暖灰底、赤陶色與 Noto Sans TC，數字欄一律等寬對齊 */
 :root{
-  --bg:#f6f3ee; --card:#ffffff; --ink:#2b2724; --muted:#857d74; --line:#e7e1d8;
-  --accent:#b5674a; --accent-ink:#fff; --soft:#f3e7e1;
-  --ok:#3f7d5a; --ok-soft:#e3f0e8; --warn:#b07a1f; --warn-soft:#f7ecd6; --bad:#b4483e; --bad-soft:#f6e1de;
+  --bg:#f6f3ee; --card:#ffffff; --ink:#2b2724; --muted:#736b63; --line:#e7e1d8;
+  --accent:#a95c40; --accent-ink:#fff; --soft:#f3e7e1;
+  --ok:#2f6f4c; --ok-soft:#e3f0e8; --warn:#8f6214; --warn-soft:#f7ecd6; --bad:#b4483e; --bad-soft:#f6e1de;
   --shadow:0 1px 2px rgba(40,30,20,.05),0 6px 20px rgba(40,30,20,.06);
 }
-@media (prefers-color-scheme: dark){
+@media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]){
     --bg:#1b1917; --card:#252220; --ink:#efe9e3; --muted:#a39a90; --line:#3a3532;
     --accent:#d58a6c; --accent-ink:#1b1917; --soft:#3a2b25;
     --ok:#7cc29a; --ok-soft:#22362b; --warn:#e0b25e; --warn-soft:#3a3020; --bad:#e58a80; --bad-soft:#3d2523;
-    --shadow:none;
+    --shadow:none; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#1b1917; --card:#252220; --ink:#efe9e3; --muted:#a39a90; --line:#3a3532;
   --accent:#d58a6c; --accent-ink:#1b1917; --soft:#3a2b25;
   --ok:#7cc29a; --ok-soft:#22362b; --warn:#e0b25e; --warn-soft:#3a3020; --bad:#e58a80; --bad-soft:#3d2523;
-  --shadow:none;
+  --shadow:none; color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC",system-ui,sans-serif;font-size:15px;line-height:1.55}
 button,input,select{font:inherit;color:inherit}
-.wrap{max-width:960px;margin:0 auto;padding:20px 16px 48px}
-.narrow{max-width:420px}
+.wrap{max-width:1120px;margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.narrow{max-width:420px;padding-top:56px}
 .banner{background:var(--warn-soft);color:var(--warn);font-size:13px;padding:8px 16px;text-align:center}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
-h1{font-size:22px;margin:0 0 4px}
-h2{font-size:17px;margin:0 0 12px}
+.banner button{margin-left:8px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:22px;margin:0;text-wrap:balance}
+h2{font-size:17px;margin:0 0 10px;text-wrap:balance}
 .muted{color:var(--muted)}
 .small{font-size:13px}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;margin:16px 0}
-.seg button{flex:1;border:0;background:transparent;padding:8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--shadow);min-width:0}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spread{justify-content:space-between}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;overflow-x:auto}
+.seg button{flex:1 0 auto;border:0;background:transparent;padding:7px 12px;border-radius:8px;cursor:pointer;color:var(--muted);white-space:nowrap}
 .seg button.on{background:var(--card);color:var(--ink);font-weight:500;box-shadow:var(--shadow)}
-label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
-input,select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card)}
-input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:transparent}
-.btn{border:1px solid var(--line);background:var(--card);padding:9px 16px;border-radius:9px;cursor:pointer}
+.tabs{margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:0 0 4px}
+input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);min-width:0}
+input[type=checkbox]{width:auto;margin:0}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{border:1px solid var(--line);background:var(--card);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
 .btn:hover{border-color:var(--muted)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:500}
-.btn.block{width:100%;margin-top:18px;padding:12px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-.link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0}
-.msg{margin-top:12px;font-size:14px;padding:8px 12px;border-radius:8px}
-.msg.err{background:var(--bad-soft);color:var(--bad)}
-.msg.ok{background:var(--ok-soft);color:var(--ok)}
-.clock{text-align:center;padding:28px 20px}
-.clock .time{font-size:56px;font-weight:700;letter-spacing:2px;font-variant-numeric:tabular-nums;line-height:1.1}
-.pill{display:inline-block;padding:3px 12px;border-radius:99px;font-size:13px;font-weight:500}
-.pill.off{background:var(--line);color:var(--muted)}
-.pill.work{background:var(--ok-soft);color:var(--ok)}
-.pill.break{background:var(--warn-soft);color:var(--warn)}
-.pill.bad{background:var(--bad-soft);color:var(--bad)}
-.punch{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:22px}
-.punch button{padding:16px 6px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;font-weight:500}
-.punch button.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.punch button:disabled{opacity:.35;cursor:not-allowed}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
-.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
-.list{list-style:none;margin:0;padding:0}
-.list li{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:8px}
-.list li:last-child{border-bottom:0}
-.tablewrap{overflow-x:auto;margin:0 -20px;padding:0 20px}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
-th{font-size:12px;color:var(--muted);font-weight:500}
-tbody tr.click{cursor:pointer}
-tbody tr.click:hover{background:var(--bg)}
-tfoot td{font-weight:700;border-bottom:0}
-.right{text-align:right}
-.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
-.toolbar input{width:auto}
-.raw{background:var(--bg)}
-.raw td{padding:6px 8px 10px 24px;white-space:normal}
-.chip{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 8px;margin:3px 6px 3px 0;font-size:13px}
-.chip button{border:0;background:none;color:var(--bad);cursor:pointer;padding:0 2px}
-.addrow{display:grid;grid-template-columns:1fr 1.4fr auto;gap:8px;margin-top:8px}
-.empty{text-align:center;padding:30px;color:var(--muted)}
-.mid{max-width:680px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
-.cardhead h2{margin:0}
-.cardhead input{width:auto}
-/* ---------- 排班 ---------- */
-.tabs{display:inline-flex;max-width:100%;margin:0 0 16px}
-.tabs button{flex:none;padding:8px 18px}
-.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
-.cal .dow{font-size:12px;color:var(--muted);text-align:center;padding:2px 0 4px}
-.cal .day{min-height:96px;border:1px solid var(--line);border-radius:10px;padding:5px;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0;background:var(--card);text-align:left}
-.cal .day:hover{border-color:var(--accent)}
-.cal .day.other{opacity:.4}
-.cal .day.today{border-color:var(--ink);border-width:1.5px}
-.cal .dnum{display:flex;justify-content:space-between;font-size:12px;font-weight:700}
-.cal .dnum span{font-weight:400;color:var(--muted);font-size:11px}
-.sc{--pc:#857d74;font-size:11px;line-height:1.35;border-radius:6px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;
-  border-left:3px solid var(--pc);
-  background:color-mix(in srgb,var(--pc) 18%,var(--card));color:color-mix(in srgb,var(--pc) 58%,var(--ink))}
-.sc.flag{box-shadow:inset 0 0 0 1.5px var(--bad)}
-.sc.flag::before{content:"!";font-weight:700;color:var(--bad);margin-right:3px}
-.sc .t{opacity:.75}
-.sc.off{background:transparent;color:var(--muted);border:1px dashed var(--muted);padding:1px 4px}
-/* 居家上班：班前面加小房子圖示 */
-.ico-home{width:11px;height:11px;vertical-align:-1px;margin-right:2px}
-.pill.home{background:var(--soft);color:var(--accent)}
-.pill.home .ico-home{width:12px;height:12px;margin-right:3px}
-/* 24 小時制時間選擇（時、分兩個下拉） */
-.tp{display:flex;align-items:center;gap:4px}
-.tp select{width:auto;flex:1;min-width:0;padding:10px 8px;font-variant-numeric:tabular-nums}
-.tp span{color:var(--muted);font-weight:700}
-/* 月曆上方：每個人的班表開關 */
-/* 月曆上方：全部／上班／休假 一鍵切換 */
-.vseg{display:inline-flex;margin:0 0 10px;max-width:100%}
-.vseg button{flex:none;padding:6px 16px}
-.sc.alloff{text-align:center;font-weight:700;color:var(--accent);border-color:var(--accent);white-space:normal;line-height:1.25;text-overflow:clip}
-.pfilter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
-.pfilter button{--pc:#857d74;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
-.pfilter button .sw{width:10px;height:10px;border-radius:50%;border:2px solid var(--pc);flex:none}
-.pfilter button.on{color:var(--ink);border-color:color-mix(in srgb,var(--pc) 45%,var(--line));background:color-mix(in srgb,var(--pc) 12%,var(--card))}
-.pfilter button.on .sw{background:var(--pc)}
-.pfilter button.off-name span{text-decoration:line-through}
-.pfilter button.ctl{color:var(--accent);border-style:dashed}
-.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:14px 0 0;cursor:pointer;width:fit-content}
-.check input{width:18px;height:18px;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
-/* 拖曳班次 */
-.cal [data-sid]{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
-.cal .day.drop-over{border:2px dashed var(--accent);padding:4px;background:var(--soft)}
-.sc.dragging{opacity:.35}
-.sc.ghost{position:fixed;left:0;top:0;z-index:70;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.25)}
-body.is-dragging,body.is-dragging *{cursor:grabbing!important;user-select:none}
-.picks button:disabled{opacity:.4;cursor:not-allowed}
-.more{font-size:11px;color:var(--muted)}
-.dotname{--pc:#857d74;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;flex:none;font-weight:700;font-size:13px;
-  box-shadow:inset 0 0 0 2px var(--pc);
-  background:color-mix(in srgb,var(--pc) 18%,var(--card));color:color-mix(in srgb,var(--pc) 58%,var(--ink))}
-.colors{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px 16px}
-.colors .rowl{padding:6px 0}
-.colorpick{width:44px;height:34px;padding:2px;border-radius:8px;cursor:pointer;flex:none}
-/* 前台月班表：格子小，只顯示名字，點一天看詳細 */
-.cal.compact .day{min-height:76px}
-.cal.compact .sc .t{display:none}
-.cal .day.sel{border-color:var(--accent);border-width:2px;padding:4px}
-.sc.me{font-weight:700;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pc) 70%,var(--ink))}
-.who{flex:1;min-width:0}
-.who .small{display:block}
-.rowl{display:flex;align-items:center;gap:10px}
-.picks{display:flex;flex-wrap:wrap;gap:6px}
-.picks button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:6px 12px;cursor:pointer}
-.picks button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.warns{margin:12px 0 0;padding-left:18px;font-size:13px;color:var(--bad);line-height:1.7}
-.calc{font-size:13px;color:var(--muted);margin-top:10px;line-height:1.6}
-.calc .w{color:var(--bad);font-weight:500}
-.modal-bg{position:fixed;inset:0;background:rgba(30,20,15,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50}
-.modal{background:var(--card);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px;max-height:90vh;overflow-y:auto;box-shadow:0 -8px 30px rgba(0,0,0,.18)}
-.modal hr{border:0;border-top:1px solid var(--line);margin:16px 0 4px}
-.modal h3{font-size:15px;margin:12px 0 0}
-.btnrow{display:flex;gap:8px;margin-top:16px}
-.btnrow .btn{flex:1;padding:11px}
-.btn.sm{padding:5px 10px;font-size:13px}
 .btn.danger{color:var(--bad)}
-@media (min-width:561px){ .modal-bg{align-items:center} .modal{border-radius:16px} }
-@media (max-width:640px){
-  .cal .day{min-height:70px;padding:4px 3px}
-  .cal .dnum span,.sc .t{display:none}
-  .sc{font-size:10.5px;padding:1px 4px;text-overflow:clip}
-  .sc.flag::before{display:none}
+.btn.tiny{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;text-decoration:underline}
+.ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ctrl input[type=month],.ctrl select{width:auto}
+.ctrl input[type=search]{width:200px;max-width:100%}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}
+.stat span{display:block;font-size:13px;color:var(--muted)}
+.stat b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.stat small{display:block;font-size:12px;color:var(--muted)}
+.neg{color:var(--bad)}
+.tablewrap{overflow-x:auto;margin:0 -18px;padding:0 18px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:13px;color:var(--muted);font-weight:500;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:var(--soft)}
+td.wide{min-width:190px}
+.pill{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;font-weight:500;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.soft{background:var(--soft);color:var(--accent)}
+.pill.off{background:var(--line);color:var(--muted)}
+.report th.mh button{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline}
+.report th.mh.on button{font-weight:700}
+.report th,.report td{padding:6px 10px;border-bottom:1px solid var(--line)}
+.report th:not(:first-child){text-align:right}
+.report td:first-child,.report th:first-child{position:sticky;left:0;background:var(--card);min-width:170px;z-index:1}
+.report tr.head td{font-weight:700;padding-top:14px;border-bottom:0}
+.report tr.line td:first-child,.report tr.memo td:first-child,.report tr.balance td:first-child{padding-left:20px}
+.report tr.sub td{font-weight:500;background:var(--bg)}
+.report tr.total td{font-weight:700;background:var(--soft)}
+.booking{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:4px 14px;padding:12px 0;border-bottom:1px solid var(--line);align-items:start}
+.booking:last-child{border-bottom:0}
+.booking .d{font-weight:500;font-variant-numeric:tabular-nums}
+.booking .pay{font-size:13px;color:var(--muted)}
+.booking .act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);padding:0;width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(30,22,16,.45)}
+.mhead{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.mhead h2{margin:0}
+.mbody{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.mfoot{display:flex;justify-content:space-between;gap:8px;padding:12px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hint{background:var(--soft);color:var(--accent);padding:8px 12px;border-radius:9px;font-size:14px}
+.err{background:var(--bad-soft);color:var(--bad);padding:8px 12px;border-radius:9px;font-size:14px}
+.okmsg{background:var(--ok-soft);color:var(--ok);padding:8px 12px;border-radius:9px;font-size:14px}
+.check{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:14px;color:var(--ink);margin:0;border-bottom:1px solid var(--line)}
+.feealert{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--bad-soft);color:var(--bad);border:1px solid var(--bad);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.feealert .small{color:var(--bad);opacity:.85}
+.empty{padding:28px 12px;text-align:center;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:9px;font-size:14px;z-index:99;max-width:calc(100vw - 32px)}
+@media (max-width:760px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2{grid-template-columns:minmax(0,1fr)}
+  .booking{grid-template-columns:minmax(0,1fr)}
+  .booking .act{justify-content:flex-start}
 }
-@media (max-width:560px){
-  .clock .time{font-size:44px}
-  .punch{grid-template-columns:repeat(2,1fr)}
-  .stats{grid-template-columns:1fr 1fr}
-  .addrow{grid-template-columns:1fr}
-}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<div id="banner"></div>
-<div id="app"><div class="wrap narrow"><p class="muted">載入中…</p></div></div>
+<div id="app"></div>
+<dialog id="dlg" aria-label="登記視窗"></dialog>
 
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script>
+/* 記帳引擎：現金與損益的所有計算都在這裡，不碰畫面也不碰資料庫 */
+(function (root) {
+  "use strict";
+
+  const DEFAULT_SETTINGS = {
+    brands: ["如梭映像", "plus", "muse", "其他"],
+    payTypes: ["訂金", "尾款", "全額", "加購", "租棚", "儲值金", "社群經營", "其他"],
+    methods: ["現金", "轉帳", "LINEPAY", "刷卡0927", "轉帳0927", "代墊款"],
+    advancers: ["居米", "嚕米"],
+    salaryNames: { 居米: "Jimmy", 嚕米: "嚕米" },
+    categories: [
+      { name: "化妝師費用", type: "direct" },
+      { name: "攝影師抽成", type: "direct" },
+      { name: "發包費用", type: "direct" },
+      { name: "薪資", type: "opex" },
+      { name: "勞健退", type: "opex" },
+      { name: "房租", type: "opex" },
+      { name: "執行成本", type: "opex" },
+      { name: "雜項購置", type: "opex" },
+      { name: "廣告費", type: "opex" },
+      { name: "餐飲費", type: "opex" },
+      { name: "手續費", type: "opex" },
+      { name: "其他", type: "opex" },
+      { name: "業主往來", type: "none" },
+    ],
+    opening: { month: "", amount: 0 },
+  };
+
+  const LINE_OF = { 訂金: "寫真服務", 尾款: "寫真服務", 全額: "寫真服務", 加購: "加購", 租棚: "租棚", 儲值金: "儲值服務", 社群經營: "社群經營", 其他: "其他收入" };
+  const CANCEL_LINE = "取消訂金收入";
+  const UNFILLED = "未填";
+  const ADVANCE = "代墊款";
+  const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+
+  const ym = d => String(d || "").slice(0, 7);
+  const pad = n => String(n).padStart(2, "0");
+  const monthKey = (year, m) => `${year}-${pad(m)}`;
+  const live = entries => entries.filter(e => !e.deleted);
+  const isCashEntry = e => e.method !== ADVANCE;
+  const signedCash = e => (e.kind === "income" ? e.amount : -e.amount);
+
+  /* ---------- 收入認列：這筆錢算在哪一天 ---------- */
+  function recognize(e) {
+    if (e.kind === "refund") return [{ date: e.date, amount: -e.amount, line: CANCEL_LINE, brand: e.brand, entry: e }];
+    if (e.kind !== "income") return [];
+    if (e.cancel) return [{ date: e.cancel.date, amount: e.amount, line: CANCEL_LINE, brand: e.brand, entry: e }];
+    const line = LINE_OF[e.payType] || "其他收入";
+    if (e.lines && e.lines.length) {
+      return e.lines.map(l => ({ date: l.date, amount: l.amount, line, brand: e.brand, entry: e, item: l.item || "" }));
+    }
+    if (e.serviceDate) return [{ date: e.serviceDate, amount: e.amount, line, brand: e.brand, entry: e }];
+    if (e.payType === "其他") return [{ date: e.date, amount: e.amount, line, brand: e.brand, entry: e }];
+    return [];
+  }
+
+  /* ---------- 費用歸屬月份 ---------- */
+  const SALARY_LAST_DAY = 15;   // 每月 15 號以前發的薪資，算前一個月
+  const previousMonth = month => {
+    const [y, m] = month.split("-").map(Number);
+    return m === 1 ? `${y - 1}-12` : `${y}-${pad(m - 1)}`;
+  };
+
+  function expenseMonth(e) {
+    if (e.cancel) return ym(e.cancel.date);
+    if (e.serviceDate) return ym(e.serviceDate);
+    if (e.pnlMonth) return e.pnlMonth;
+    if (e.category === "薪資" && e.date && +e.date.slice(8, 10) <= SALARY_LAST_DAY) return previousMonth(ym(e.date));
+    if (e.category === "勞健退") return insuranceMonth(e);
+    return ym(e.date);
+  }
+
+  /* 勞健保依細項寫的月份計算，例如 10 月繳的「08月勞保費」算 8 月；沒寫月份就算繳費月 */
+  function insuranceMonth(e) {
+    const paid = ym(e.date);
+    const hit = String(e.desc || "").match(/(?:^|\D)(\d{1,2})月/);
+    if (!hit || +hit[1] < 1 || +hit[1] > 12) return paid;
+    const year = +paid.slice(0, 4);
+    const same = `${year}-${pad(+hit[1])}`;
+    return same <= paid ? same : `${year - 1}-${pad(+hit[1])}`;
+  }
+
+  function categoryType(settings, name) {
+    const c = settings.categories.find(x => x.name === name);
+    return c ? c.type : "opex";
+  }
+
+  /* ---------- 餘額 ---------- */
+  function balancesAt(entries, monthEnd) {
+    let deferred = 0, receivable = 0;
+    for (const e of live(entries)) {
+      if (e.kind !== "income" && e.kind !== "refund") continue;
+      const amount = signedCash(e);
+      const rec = recognize(e).filter(r => r.date <= monthEnd).reduce((s, r) => s + r.amount, 0);
+      if (e.date <= monthEnd) deferred += amount - rec;
+      else receivable += rec;
+    }
+    return { deferred, receivable };
+  }
+
+  /* 代墊款隨下個月初的薪資一起撥還：上個月底以前未還的代墊，由當月薪資扣抵。
+     薪資那筆仍保留實際匯款金額，只是其中一部分算歸還代墊，不算薪資費用。 */
+  /* 刷卡手續費：存在原本那筆支出上，計算時拆成一筆「手續費」支出 */
+  const isCard = method => /刷卡|信用卡/.test(method || "");
+  const feePending = e => e.kind === "expense" && !e.deleted && isCard(e.method) && e.source !== "import" && !e.feeOf
+    && (e.feeStatus === "pending" || (e.feeStatus === undefined && !(e.fee > 0)));
+
+  function withFees(entries) {
+    const out = [];
+    for (const e of entries) {
+      out.push(e);
+      if (e.kind === "expense" && !e.deleted && isCard(e.method) && e.fee > 0 && e.feeStatus !== "none") {
+        out.push({
+          id: `${e.id}#fee`, feeOf: e.id, kind: "expense", category: "手續費", date: e.feeDate || e.date, amount: +e.fee,
+          method: e.method, brand: e.brand || "", desc: `${e.desc}刷卡手續費`, note: "", customer: "", serviceDate: "",
+        });
+      }
+    }
+    return out;
+  }
+
+  function settle(entries, settings) {
+    entries = withFees(entries);
+    const list = live(entries);
+    const names = settings.salaryNames || {};
+    const people = new Set(list.filter(e => (e.kind === "expense" && e.method === ADVANCE) || e.kind === "reimburse").map(e => e.advancedBy || UNFILLED));
+    const repaid = {};
+    for (const person of people) {
+      const key = names[person] || person;
+      const isAdvance = e => e.kind === "expense" && e.method === ADVANCE && (e.advancedBy || UNFILLED) === person;
+      const isReturn = e => e.kind === "reimburse" && (e.advancedBy || UNFILLED) === person;
+      const isSalary = e => e.kind === "expense" && e.category === "薪資" && e.method !== ADVANCE && String(e.desc || "").includes(key);
+      const events = list.filter(e => isAdvance(e) || isReturn(e) || isSalary(e)).sort((a, b) => a.date.localeCompare(b.date));
+      let returned = 0;
+      for (const e of events) {
+        if (isReturn(e)) returned += e.amount;
+        else if (isSalary(e)) {
+          const start = `${ym(e.date)}-01`;
+          const due = events.filter(x => isAdvance(x) && x.date < start).reduce((s, x) => s + x.amount, 0);
+          const auto = Math.min(Math.max(0, due - returned), e.amount);
+          const amount = e.advanceManual === undefined || e.advanceManual === null ? auto : e.advanceManual;
+          repaid[e.id] = { advanceRepaid: amount, repaidFor: person };
+          returned += amount;
+        }
+      }
+    }
+    return entries.map(e => (repaid[e.id] ? { ...e, ...repaid[e.id] } : e));
+  }
+
+  const netExpense = e => e.amount - (e.advanceRepaid || 0);
+
+  function advanceOwed(entries, upTo, settings) {
+    const owed = {};
+    const add = (name, n) => { owed[name || UNFILLED] = (owed[name || UNFILLED] || 0) + n; };
+    for (const e of live(settle(entries, settings))) {
+      if (upTo && e.date > upTo) continue;
+      if (e.kind === "expense" && e.method === ADVANCE) add(e.advancedBy, e.amount);
+      if (e.kind === "reimburse") add(e.advancedBy, -e.amount);
+      if (e.advanceRepaid) add(e.repaidFor, -e.advanceRepaid);
+    }
+    return owed;
+  }
+
+  const monthEndOf = key => {
+    const [y, m] = key.split("-").map(Number);
+    return `${key}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
+  };
+
+  const blank = () => MONTHS.map(() => 0);
+  const addTo = (map, key, idx, amt) => { (map[key] = map[key] || blank())[idx] += amt; };
+  const sum = a => a.reduce((s, x) => s + x, 0);
+  const lineRow = (key, label, values) => ({ key, label, type: "line", values, total: sum(values) });
+
+  function sumRow(key, label, rows, type = "sub") {
+    const values = blank();
+    rows.forEach(r => r.values.forEach((v, i) => { values[i] += v; }));
+    return { key, label, type, values, total: sum(values), f: { sum: rows.map(r => r.key) } };
+  }
+
+  /* ---------- 損益表 ---------- */
+  function buildPnL(entries, settings, year) {
+    const prefix = `${year}-`;
+    const revenue = {}, cost = {}, opex = {}, details = MONTHS.map(() => []);
+    const cash = blank();
+    for (const e of live(settle(entries, settings))) {
+      if (e.kind === "income" || e.kind === "refund") {
+        if (e.date.startsWith(prefix)) cash[+e.date.slice(5, 7) - 1] += signedCash(e);
+        for (const r of recognize(e)) {
+          if (!r.date.startsWith(prefix)) continue;
+          const i = +r.date.slice(5, 7) - 1;
+          addTo(revenue, `${r.brand}｜${r.line}`, i, r.amount);
+          details[i].push(r);
+        }
+      } else if (e.kind === "expense") {
+        const type = categoryType(settings, e.category);
+        if (type === "none") continue;
+        const month = expenseMonth(e);
+        if (!month.startsWith(prefix)) continue;
+        const i = +month.slice(5, 7) - 1;
+        addTo(type === "direct" ? cost : opex, e.category, i, netExpense(e));
+        details[i].push({ date: e.date, amount: -netExpense(e), line: e.category, brand: e.brand, entry: e });
+      }
+    }
+    const brandRank = k => { const i = settings.brands.indexOf(k.split("｜")[0]); return i < 0 ? 99 : i; };
+    const lineRank = k => [...Object.values(LINE_OF), CANCEL_LINE].indexOf(k.split("｜")[1]);
+    const revKeys = Object.keys(revenue).sort((a, b) => brandRank(a) - brandRank(b) || lineRank(a) - lineRank(b));
+    const revRows = revKeys.map(k => lineRow(`rev:${k}`, k.replace("｜", " "), revenue[k]));
+    const catOrder = settings.categories.map(c => c.name);
+    const order = o => Object.keys(o).sort((a, b) => catOrder.indexOf(a) - catOrder.indexOf(b));
+    const costRows = order(cost).map(k => lineRow(`cost:${k}`, k, cost[k]));
+    const opexRows = order(opex).map(k => lineRow(`opex:${k}`, k, opex[k]));
+    const totalRev = sumRow("totalRev", "營業收入合計", revRows);
+    const totalCost = sumRow("totalCost", "營業成本合計", costRows);
+    const totalOpex = sumRow("totalOpex", "營業費用合計", opexRows);
+    const delta = (key, label, a, b) => ({
+      key, label, type: "total", values: a.values.map((v, i) => v - b.values[i]), total: a.total - b.total, f: { minus: [a.key, b.key] },
+    });
+    const gross = delta("gross", "毛利", totalRev, totalCost);
+    const net = delta("net", "營業淨利", gross, totalOpex);
+    const deferred = blank(), receivable = blank();
+    MONTHS.forEach((m, i) => {
+      const b = balancesAt(entries, monthEndOf(monthKey(year, m)));
+      deferred[i] = b.deferred;
+      receivable[i] = b.receivable;
+    });
+    const memo = (key, label, values, type) => ({ key, label, type, values, total: type === "memo" ? sum(values) : null });
+    return {
+      year, details,
+      rows: [
+        { type: "head", label: "營業收入" }, ...revRows, totalRev,
+        { type: "head", label: "營業成本" }, ...costRows, totalCost, gross,
+        { type: "head", label: "營業費用" }, ...opexRows, totalOpex, net,
+        { type: "head", label: "預收款對帳" },
+        memo("cashIn", "本月實收現金（扣退款）", cash, "memo"),
+        { ...memo("recog", "本月認列收入", totalRev.values, "memo") },
+        memo("deferred", "月底預收款餘額", deferred, "balance"),
+        memo("receivable", "月底已服務、之後才收的款", receivable, "balance"),
+      ],
+    };
+  }
+
+  /* ---------- 現金流量表 ---------- */
+  function buildCash(entries, settings, year) {
+    const prefix = `${year}-`;
+    const inflow = {}, outflow = {};
+    const advance = blank();
+    const methods = {};
+    const touch = m => (methods[m] = methods[m] || { in: blank(), out: blank() });
+    for (const e of live(settle(entries, settings))) {
+      if (!e.date.startsWith(prefix)) continue;
+      const i = +e.date.slice(5, 7) - 1;
+      const method = e.method || UNFILLED;
+      if (e.kind === "income") { addTo(inflow, e.brand || "其他", i, e.amount); touch(method).in[i] += e.amount; continue; }
+      if (!isCashEntry(e)) { advance[i] += e.amount; continue; }
+      const label = e.kind === "refund" ? "取消退款" : e.kind === "reimburse" ? "歸還代墊款" : e.category;
+      addTo(outflow, label, i, netExpense(e));
+      if (e.advanceRepaid) addTo(outflow, "歸還代墊款", i, e.advanceRepaid);
+      touch(method).out[i] += e.amount;
+    }
+    const brandOrder = k => { const i = settings.brands.indexOf(k); return i < 0 ? 99 : i; };
+    const inRows = Object.keys(inflow).sort((a, b) => brandOrder(a) - brandOrder(b)).map(k => lineRow(`in:${k}`, k, inflow[k]));
+    const catOrder = [...settings.categories.map(c => c.name), "取消退款", "歸還代墊款"];
+    const outRows = Object.keys(outflow).sort((a, b) => catOrder.indexOf(a) - catOrder.indexOf(b)).map(k => lineRow(`out:${k}`, k, outflow[k]));
+    const totalIn = sumRow("totalIn", "現金流入合計", inRows);
+    const totalOut = sumRow("totalOut", "現金流出合計", outRows);
+    const netValues = totalIn.values.map((v, i) => v - totalOut.values[i]);
+    const net = { key: "netCash", label: "本月淨現金流", type: "total", values: netValues, total: sum(netValues), f: { minus: ["totalIn", "totalOut"] } };
+    const rows = [
+      { type: "head", label: "現金流入" }, ...inRows, totalIn,
+      { type: "head", label: "現金流出" }, ...outRows, totalOut, net,
+    ];
+    const op = settings.opening || {};
+    if (op.month) {
+      const opening = blank(), ending = blank();
+      const all = live(entries).filter(e => e.kind !== "expense" || isCashEntry(e));
+      MONTHS.forEach((m, i) => {
+        const key = monthKey(year, m);
+        if (key < op.month) { opening[i] = null; ending[i] = null; return; }
+        const start = `${key}-01`, end = monthEndOf(key);
+        const flow = upto => all.filter(e => ym(e.date) >= op.month && e.date <= upto).reduce((s, e) => s + signedCash(e), 0);
+        opening[i] = op.amount + flow(`${start.slice(0, 8)}00`);
+        ending[i] = op.amount + flow(end);
+      });
+      rows.push({ type: "head", label: "現金餘額" });
+      rows.push({ key: "opening", label: "月初現金", type: "balance", values: opening, total: null });
+      rows.push({ key: "ending", label: "月底現金", type: "balance", values: ending, total: null });
+    }
+    const owed = MONTHS.map(m => sum(Object.values(advanceOwed(entries, monthEndOf(monthKey(year, m)), settings))));
+    rows.push({ type: "head", label: "代墊款（尚未付現，不算在流出）" });
+    rows.push({ key: "adv", label: "本月新增代墊", type: "memo", values: advance, total: sum(advance) });
+    rows.push({ key: "owed", label: "月底未還代墊款", type: "balance", values: owed, total: null });
+    const methodRows = Object.keys(methods).sort((a, b) => settings.methods.indexOf(a) - settings.methods.indexOf(b)).map(k => {
+      const net = methods[k].in.map((v, i) => v - methods[k].out[i]);
+      return { label: k, in: methods[k].in, out: methods[k].out, net };
+    });
+    return { year, rows, methods: methodRows };
+  }
+
+  /* ---------- 預約：同一位客人＋同一天的收款自動歸在一起 ---------- */
+  function bookings(entries) {
+    const map = new Map();
+    for (const e of live(entries)) {
+      if (e.kind !== "income" || !e.serviceDate) continue;
+      const key = `${e.serviceDate}|${e.customer || ""}`;
+      if (!map.has(key)) map.set(key, { key, serviceDate: e.serviceDate, customer: e.customer || "", brand: e.brand, entries: [], received: 0, cancelled: null });
+      const b = map.get(key);
+      b.entries.push(e);
+      b.received += e.amount;
+      if (e.cancel) b.cancelled = e.cancel;
+    }
+    for (const e of live(entries)) {
+      if (e.kind === "refund" && map.has(e.bookingKey)) map.get(e.bookingKey).refunded = (map.get(e.bookingKey).refunded || 0) + e.amount;
+    }
+    return [...map.values()].sort((a, b) => a.serviceDate.localeCompare(b.serviceDate) || a.customer.localeCompare(b.customer));
+  }
+
+  function storedValues(entries) {
+    return live(entries).filter(e => e.kind === "income" && e.payType === "儲值金").map(e => {
+      const used = (e.lines || []).reduce((s, l) => s + l.amount, 0);
+      return { entry: e, used, left: e.amount - used };
+    });
+  }
+
+  function retitle(desc, oldDate, newDate) {
+    const mmdd = d => `${d.slice(5, 7)}/${d.slice(8, 10)}`;
+    return String(desc || "").replace(new RegExp(`^${mmdd(oldDate)}`), mmdd(newDate));
+  }
+
+  function reschedule(selected, newDate, who, now) {
+    return selected.map(e => ({
+      ...e,
+      serviceDate: newDate,
+      desc: retitle(e.desc, e.serviceDate, newDate),
+      history: [...(e.history || []), { at: now, by: who, action: "改期", from: e.serviceDate, to: newDate }],
+    }));
+  }
+
+  function cancelBooking(selected, opts) {
+    const { date, refund = 0, method = "", who = "", now = "", makeId } = opts;
+    const incomes = selected.filter(e => e.kind === "income");
+    const received = incomes.reduce((s, e) => s + e.amount, 0);
+    if (refund < 0 || refund > received) throw new Error(`退款金額要介於 0 到已收的 ${received} 元之間`);
+    const updates = selected.map(e => ({
+      ...e, cancel: { date },
+      history: [...(e.history || []), { at: now, by: who, action: "取消", date, refund }],
+    }));
+    if (refund > 0) {
+      const f = incomes[0];
+      updates.push({
+        id: makeId(), kind: "refund", date, amount: refund, brand: f.brand, customer: f.customer, method,
+        desc: `${f.serviceDate.slice(5, 7)}/${f.serviceDate.slice(8, 10)}${f.customer}取消退款`,
+        bookingKey: `${f.serviceDate}|${f.customer || ""}`, category: "", note: "",
+      });
+    }
+    return updates;
+  }
+
+  function undoCancel(entries, booking, who, now) {
+    const updates = booking.entries.map(e => {
+      const { cancel, ...rest } = e;
+      return { ...rest, cancel: null, history: [...(e.history || []), { at: now, by: who, action: "復原取消" }] };
+    });
+    for (const e of live(entries)) {
+      if (e.kind === "refund" && e.bookingKey === booking.key) updates.push({ ...e, deleted: true });
+      if (e.kind === "expense" && e.cancel && e.serviceDate === booking.serviceDate && (e.customer || "") === booking.customer) {
+        updates.push({ ...e, cancel: null });
+      }
+    }
+    return updates;
+  }
+
+  function makeDesc(e) {
+    const date = e.serviceDate ? `${e.serviceDate.slice(5, 7)}/${e.serviceDate.slice(8, 10)}` : "";
+    const item = e.serviceItem || "";
+    const type = e.payType === "全額" || item.includes(e.payType || " ") ? (e.payType === "全額" ? "全額" : "") : e.payType || "";
+    return `${date}${e.customer || ""}${item}${type}`;
+  }
+
+  /* 登記時的即時提示：這筆錢會進哪個月 */
+  function explain(e) {
+    if (e.kind === "income") {
+      const rec = recognize(e);
+      if (!e.date) return "";
+      if (!rec.length) return `先列入預收款，等實際使用時再認列收入。`;
+      const m = ym(rec[0].date);
+      const label = `${m.slice(0, 4)} 年 ${+m.slice(5)} 月`;
+      if (m > ym(e.date)) return `現金算 ${+e.date.slice(5, 7)} 月，收入算 ${label}，在那之前都列在預收款。`;
+      if (m < ym(e.date)) return `現金算 ${+e.date.slice(5, 7)} 月，收入算回 ${label}。`;
+      return `現金和收入都算 ${label}。`;
+    }
+    if (e.kind === "expense") {
+      const m = expenseMonth(e);
+      if (!m) return "";
+      return `費用算 ${m.slice(0, 4)} 年 ${+m.slice(5)} 月。${e.method === ADVANCE ? "公司尚未付現，先記為代墊款。" : ""}`;
+    }
+    return "";
+  }
+
+  /* ---------- 匯入現有 Excel ---------- */
+  function inferDate(month, day, cashDate) {
+    const y = +cashDate.slice(0, 4);
+    const cash = Date.UTC(y, +cashDate.slice(5, 7) - 1, +cashDate.slice(8, 10));
+    const best = [y - 1, y, y + 1]
+      .map(c => ({ c, gap: Math.abs(Date.UTC(c, month - 1, day) - cash) }))
+      .sort((a, b) => a.gap - b.gap)[0].c;
+    return `${best}-${pad(month)}-${pad(day)}`;
+  }
+
+  const ITEM_START = /(改?(?:個人|雙人|[二三四五六七八九\d]人|兩套|三套|四套)|租棚|加購|補?訂金|尾款|全額)/;
+
+  /* 支援 10/15、10.15、10-15、10月15日，以及沒有分隔符號的 1015 */
+  const LEADING_DATE = /^(\d{1,2})[\/.\-月](\d{1,2})日?((?:[、,~～\-]\d{1,4})*)\s*(.*)$/;
+  const LEADING_MMDD = /^(\d{2})(\d{2})(?!\d)((?:[、,~～\-]\d{1,4})*)\s*(.*)$/;
+  const MONTH_INSIDE = /^(.+?)(?:(\d{1,2})[-~～、至到])?(\d{1,2})月(?!\d)(.*)$/;
+  const validDay = (month, day) => month >= 1 && month <= 12 && day >= 1 && day <= new Date(Date.UTC(2024, month, 0)).getUTCDate();
+
+  function parseIncomeDesc(desc, cashDate) {
+    const flags = [];
+    let text = String(desc || "").trim();
+    let serviceDate = "";
+    let brandHint = "";
+    let nameBefore = "";
+    let m = text.match(LEADING_DATE) || text.match(LEADING_MMDD);
+    if (m && !validDay(+m[1], +m[2])) m = null;
+    if (m) {
+      serviceDate = inferDate(+m[1], +m[2], cashDate);
+      text = m[4];
+      if (m[3]) flags.push("跨多天，先算在第一天");
+    } else if ((m = text.match(/^(\d{1,2})月\s*(.*)$/))) {
+      serviceDate = monthEndOf(inferDate(+m[1], 1, cashDate).slice(0, 7));
+      text = m[2];
+      flags.push("只有月份，先算在月底");
+    } else if ((m = text.match(MONTH_INSIDE)) && validDay(+(m[2] || m[3]), 1) && validDay(+m[3], 1)) {
+      /* 例如「戀愛大學7月社群經營費用」：月份寫在中間，整筆算該月 */
+      serviceDate = monthEndOf(inferDate(+(m[2] || m[3]), 1, cashDate).slice(0, 7));
+      nameBefore = m[1].replace(/\d{2,4}年$/, "").trim();
+      text = m[4];
+      if (m[2]) flags.push("跨多個月，先算在第一個月");
+    }
+    const brand = text.match(/plus|muse/i);
+    if (brand) {
+      brandHint = brand[0].toLowerCase();
+      text = text.replace(brand[0], "");
+    }
+    const cut = text.search(ITEM_START);
+    const customer = nameBefore || (cut >= 0 ? text.slice(0, cut) : "").trim();
+    const rest = (cut >= 0 ? text.slice(cut) : text).trim();
+    let payType = "全額", serviceItem = "";
+    if (/租棚/.test(rest)) payType = "租棚";
+    else if (/加購/.test(rest)) payType = "加購";
+    else if (/訂金/.test(rest)) payType = "訂金";
+    else if (/尾款/.test(rest)) payType = "尾款";
+    else if (/社群|代操|小編/.test(rest)) payType = "社群經營";
+    else payType = "其他";
+    if (payType === "租棚") serviceItem = "租棚";
+    else if (payType === "加購") serviceItem = rest.replace(/.*加購/, "").trim();
+    else if (payType === "社群經營") serviceItem = rest.replace(/費用?$/, "").trim();
+    else serviceItem = rest.replace(/補?訂金|尾款/g, "").trim();
+    return { serviceDate, customer, payType, serviceItem, brandHint, flags };
+  }
+
+  const NO_DATE_FLAG = "找不到服務日期，先列預收款";
+
+  /* 已匯入的紀錄用新的判讀規則再讀一次細項 */
+  function reparseEntry(e) {
+    if (e.kind !== "income" || e.deleted || e.cancel || e.source !== "import") return null;
+    if (e.serviceDate || e.lines?.length || e.payType === "儲值金") return null;
+    const p = parseIncomeDesc(e.desc, e.date);
+    if (!p.serviceDate) return null;
+    const flags = [...(e.flags || []).filter(f => f !== NO_DATE_FLAG && !f.startsWith("項目「")), ...p.flags];
+    const { flags: _old, ...rest } = e;
+    return {
+      ...rest,
+      serviceDate: p.serviceDate,
+      customer: p.customer || e.customer,
+      payType: p.payType === "其他" ? e.payType : p.payType,
+      serviceItem: p.serviceItem,
+      brand: e.brand === "其他" && p.brandHint ? p.brandHint : e.brand,
+      ...(flags.length ? { flags } : {}),
+    };
+  }
+
+  /* 缺資料的不能直接確認，要先補上服務日期或金流方式 */
+  const MISSING_FLAGS = [NO_DATE_FLAG, "沒有金流方式"];
+  const canConfirm = e => !!e.flags?.length && !e.flags.some(f => MISSING_FLAGS.includes(f));
+
+  function confirmEntry(e, who, now) {
+    const { flags, ...rest } = e;
+    return { ...rest, history: [...(e.history || []), { at: now, by: who, action: "批次確認", flags }] };
+  }
+
+  function parseRow(row, settings) {
+    const flags = [];
+    const base = {
+      date: row.date, desc: String(row.desc || "").trim(), method: row.method || "", note: row.note || "",
+      advancedBy: row.advancedBy || "", source: "import",
+    };
+    const brands = settings.brands;
+    const item = String(row.item || "").trim();
+    let entry;
+    if (row.income) {
+      const p = parseIncomeDesc(base.desc, row.date);
+      const brand = brands.find(b => b.toLowerCase() === item.toLowerCase());
+      entry = { ...base, kind: "income", amount: row.income, brand: brand || p.brandHint || "其他", customer: p.customer, payType: p.payType, serviceItem: p.serviceItem, serviceDate: p.serviceDate };
+      flags.push(...p.flags);
+      if (item && !brand) {
+        if (/儲值/.test(base.desc)) {
+          entry.customer = item; entry.payType = "儲值金"; entry.serviceDate = "";
+          flags.push("儲值金，先列預收款");
+        } else if (item !== "其他" && entry.payType !== "社群經營") flags.push(`項目「${item}」不是品牌，先歸其他`);
+      }
+      if (entry.payType === "其他" && !entry.customer) entry.customer = "";
+      if (!entry.serviceDate && entry.payType !== "儲值金" && entry.payType !== "其他") flags.push(NO_DATE_FLAG);
+    } else {
+      const brand = brands.find(b => b !== "其他" && b.toLowerCase() === item.toLowerCase());
+      const known = settings.categories.some(c => c.name === item);
+      entry = { ...base, kind: "expense", amount: row.expense, brand: brand || "", category: brand ? "雜項購置" : known ? item : "其他", serviceDate: "", customer: "" };
+      if (brand) flags.push("原本記在品牌下，先歸雜項購置");
+      else if (!known) flags.push(`科目「${item}」不在清單，先歸其他`);
+    }
+    if (!entry.method) flags.push("沒有金流方式");
+    return { entry, flags };
+  }
+
+  function markSuspects(parsed) {
+    const seen = new Map();
+    parsed.forEach(p => {
+      if (p.entry.kind !== "expense") return;
+      const k = `${p.entry.date}|${p.entry.amount}|${p.entry.category}`;
+      if (seen.has(k)) { p.flags.push("同日同金額，可能重複"); seen.get(k).flags.push("同日同金額，可能重複"); }
+      else seen.set(k, p);
+    });
+    return parsed;
+  }
+
+  const fingerprint = e => `${e.date}|${e.kind}|${e.amount}|${(e.desc || "").replace(/\s/g, "")}`;
+
+  /* ---------- Excel 輸出 ---------- */
+  const COLOR = { head: "FFF3E7E1", sub: "FFF6F3EE", total: "FFE9DED6", line: "FFE7E1D8" };
+  const MONEY = '#,##0;[Red]-#,##0;"-"';
+  const colName = n => { let s = ""; while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - r - 1) / 26; } return s; };
+
+  function writeReport(ws, title, rows, year) {
+    ws.addRow([title]).font = { bold: true, size: 14 };
+    ws.addRow([]);
+    const header = ws.addRow(["科目", ...MONTHS.map(m => `${year}/${pad(m)}`), "全年合計"]);
+    header.font = { bold: true };
+    header.alignment = { horizontal: "center" };
+    header.eachCell(c => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.head } }; });
+    const rowOf = {};
+    let n = header.number;
+    rows.forEach(r => { n += 1; if (r.key) rowOf[r.key] = n; });
+    const formula = (r, col) => {
+      if (r.f && r.f.sum) {
+        if (!r.f.sum.length) return null;
+        const nums = r.f.sum.map(k => rowOf[k]);
+        return `SUM(${col}${Math.min(...nums)}:${col}${Math.max(...nums)})`;
+      }
+      if (r.f && r.f.minus) return `${col}${rowOf[r.f.minus[0]]}-${col}${rowOf[r.f.minus[1]]}`;
+      if (r.key === "recog") return `${col}${rowOf.totalRev}`;
+      return null;
+    };
+    rows.forEach(r => {
+      if (r.type === "head") {
+        const h = ws.addRow([r.label]);
+        h.font = { bold: true };
+        return;
+      }
+      const row = ws.addRow([r.label]);
+      r.values.forEach((v, i) => {
+        const col = colName(i + 2);
+        const f = formula(r, col);
+        row.getCell(i + 2).value = f ? { formula: f, result: v } : v;
+      });
+      if (r.total !== null && r.total !== undefined) {
+        row.getCell(14).value = { formula: formula(r, "N") || `SUM(B${row.number}:M${row.number})`, result: r.total };
+      }
+      for (let c = 2; c <= 14; c++) row.getCell(c).numFmt = MONEY;
+      if (r.type === "line" || r.type === "memo" || r.type === "balance") row.getCell(1).alignment = { indent: 1 };
+      if (r.type === "sub" || r.type === "total") {
+        row.font = { bold: true };
+        row.eachCell({ includeEmpty: true }, c => {
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: r.type === "total" ? COLOR.total : COLOR.sub } };
+          c.border = { top: { style: "thin", color: { argb: COLOR.line } } };
+        });
+      }
+    });
+    ws.getColumn(1).width = 28;
+    for (let c = 2; c <= 14; c++) ws.getColumn(c).width = 11;
+    ws.views = [{ state: "frozen", xSplit: 1, ySplit: header.number }];
+  }
+
+  function writeTable(ws, columns, rows) {
+    const header = ws.addRow(columns.map(c => c.label));
+    header.font = { bold: true };
+    header.eachCell(c => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: COLOR.head } }; });
+    rows.forEach(r => ws.addRow(columns.map(c => r[c.key] === undefined ? "" : r[c.key])));
+    columns.forEach((c, i) => {
+      const col = ws.getColumn(i + 1);
+      col.width = c.width || 12;
+      if (c.money) col.numFmt = "#,##0";
+    });
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+    ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
+  }
+
+  const pnlMonthOf = e => {
+    if (e.kind === "expense") return expenseMonth(e);
+    const r = recognize(e);
+    if (e.kind === "income" && !r.length) return "預收款";
+    if (e.kind === "reimburse") return "不列損益";
+    return [...new Set(r.map(x => ym(x.date)))].join("、");
+  };
+
+  function ledgerRows(entries, year, settings) {
+    return live(settle(entries, settings)).filter(e => !year || e.date.startsWith(`${year}-`)).sort((a, b) => a.date.localeCompare(b.date)).map(e => ({
+      date: e.date,
+      item: e.kind === "expense" ? e.category : e.kind === "income" ? e.brand : e.kind === "refund" ? "取消退款" : "歸還代墊款",
+      desc: e.desc,
+      income: e.kind === "income" ? e.amount : "",
+      expense: e.kind === "income" ? "" : e.amount,
+      method: e.method || "",
+      advancedBy: e.advancedBy || "",
+      note: [e.note, e.advanceRepaid ? `含代墊款 ${e.advanceRepaid}` : "", feePending(e) ? "手續費未入帳" : ""].filter(Boolean).join("；"),
+      serviceDate: e.serviceDate || "",
+      pnlMonth: e.kind === "expense" && categoryType(settings, e.category) === "none" ? "不列損益" : pnlMonthOf(e),
+    }));
+  }
+
+  function workbookPnL(ExcelJS, entries, settings, year) {
+    const wb = new ExcelJS.Workbook();
+    const report = buildPnL(entries, settings, year);
+    writeReport(wb.addWorksheet("損益表"), `${year} 年損益表`, report.rows, year);
+    const lines = report.details.flat().filter(d => d.entry.kind !== "expense").sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
+      month: ym(d.date), date: d.date, brand: d.brand, customer: d.entry.customer || "", line: d.line, desc: d.entry.desc,
+      amount: d.amount, cashDate: d.entry.date, method: d.entry.method || "",
+    }));
+    writeTable(wb.addWorksheet("收入明細"), [
+      { key: "month", label: "損益月份", width: 10 }, { key: "date", label: "認列日期" }, { key: "brand", label: "品牌", width: 10 },
+      { key: "customer", label: "客人", width: 12 }, { key: "line", label: "收入類別", width: 14 }, { key: "desc", label: "細項", width: 30 },
+      { key: "amount", label: "金額", money: true, width: 10 }, { key: "cashDate", label: "入帳日" }, { key: "method", label: "金流方式" },
+    ], lines);
+    const costs = report.details.flat().filter(d => d.entry.kind === "expense").sort((a, b) => a.date.localeCompare(b.date)).map(d => ({
+      month: expenseMonth(d.entry), date: d.date, category: d.line, brand: d.brand || "", desc: d.entry.desc, amount: -d.amount, method: d.entry.method || "",
+    }));
+    writeTable(wb.addWorksheet("費用明細"), [
+      { key: "month", label: "損益月份", width: 10 }, { key: "date", label: "付款日" }, { key: "category", label: "科目", width: 12 },
+      { key: "brand", label: "品牌", width: 10 }, { key: "desc", label: "細項", width: 30 }, { key: "amount", label: "金額", money: true, width: 10 }, { key: "method", label: "金流方式" },
+    ], costs);
+    writeTable(wb.addWorksheet("預收款明細"), [
+      { key: "cashDate", label: "入帳日" }, { key: "serviceDate", label: "服務日期" }, { key: "brand", label: "品牌", width: 10 }, { key: "customer", label: "客人", width: 12 },
+      { key: "desc", label: "細項", width: 30 }, { key: "amount", label: "預收金額", money: true, width: 10 },
+    ], deferredList(entries, `${year}-12-31`));
+    return wb;
+  }
+
+  function deferredList(entries, asOf) {
+    const out = [];
+    for (const e of live(entries)) {
+      if (e.kind !== "income" || e.date > asOf) continue;
+      const left = e.amount - recognize(e).filter(r => r.date <= asOf).reduce((s, r) => s + r.amount, 0);
+      if (left) out.push({ cashDate: e.date, serviceDate: e.serviceDate || "未排定", brand: e.brand, customer: e.customer || "", desc: e.desc, amount: left });
+    }
+    return out.sort((a, b) => a.serviceDate.localeCompare(b.serviceDate));
+  }
+
+  function workbookCash(ExcelJS, entries, settings, year) {
+    const wb = new ExcelJS.Workbook();
+    const report = buildCash(entries, settings, year);
+    writeReport(wb.addWorksheet("現金流量表"), `${year} 年現金流量表`, report.rows, year);
+    const flat = [];
+    report.methods.forEach(m => {
+      flat.push({ key: `m:${m.label}:in`, label: `${m.label} 收入`, type: "line", values: m.in, total: sum(m.in) });
+      flat.push({ key: `m:${m.label}:out`, label: `${m.label} 支出`, type: "line", values: m.out, total: sum(m.out) });
+    });
+    writeReport(wb.addWorksheet("金流方式"), `${year} 年各金流方式收支`, flat, year);
+    writeTable(wb.addWorksheet("流水帳"), [
+      { key: "date", label: "日期" }, { key: "item", label: "項目", width: 11 }, { key: "desc", label: "細項", width: 30 },
+      { key: "income", label: "收入", money: true, width: 10 }, { key: "expense", label: "支出", money: true, width: 10 },
+      { key: "method", label: "金流方式" }, { key: "advancedBy", label: "代墊款人", width: 9 }, { key: "note", label: "備註", width: 16 },
+      { key: "serviceDate", label: "服務日期" }, { key: "pnlMonth", label: "損益月份", width: 12 },
+    ], ledgerRows(entries, year, settings));
+    return wb;
+  }
+
+  root.LedgerEngine = {
+    DEFAULT_SETTINGS, ADVANCE, UNFILLED, CANCEL_LINE, recognize, expenseMonth, categoryType, isCard, feePending, withFees, balancesAt, settle, advanceOwed, monthEndOf,
+    buildPnL, buildCash, bookings, storedValues, reschedule, cancelBooking, undoCancel, makeDesc, explain, inferDate,
+    parseIncomeDesc, parseRow, reparseEntry, canConfirm, confirmEntry, NO_DATE_FLAG, markSuspects, fingerprint, workbookPnL, workbookCash, ledgerRows, deferredList, live, ym,
+  };
+  if (typeof module !== "undefined") module.exports = root.LedgerEngine;
+})(typeof window !== "undefined" ? window : globalThis);
+
+/* 示範模式用的虛構資料，客人和金額都不是真的 */
+function sampleEntries() {
+  const income = (id, date, brand, customer, serviceItem, payType, serviceDate, amount, method, extra = {}) => {
+    const e = { id, kind: "income", date, brand, customer, serviceItem, payType, serviceDate, amount, method, note: "", ...extra };
+    e.desc = LedgerEngine.makeDesc(e);
+    return e;
+  };
+  const expense = (id, date, category, desc, amount, method, extra = {}) => ({ id, kind: "expense", date, category, desc, amount, method, brand: "", note: "", ...extra });
+  const rows = [
+    income("s1", "2026-09-20", "如梭映像", "範例小安", "個人", "訂金", "2026-10-08", 3000, "轉帳"),
+    income("s2", "2026-10-08", "如梭映像", "範例小安", "個人", "尾款", "2026-10-08", 5790, "LINEPAY"),
+    income("s3", "2026-10-03", "如梭映像", "範例阿凱", "雙人", "訂金", "2026-12-12", 4000, "轉帳"),
+    income("s4", "2026-10-05", "plus", "範例小圓", "兩套", "訂金", "2026-11-14", 5000, "LINEPAY"),
+    income("s5", "2026-10-06", "muse", "範例米娜", "", "訂金", "2026-11-26", 1000, "轉帳"),
+    income("s6", "2026-10-10", "如梭映像", "範例佩佩", "個人", "訂金", "2026-10-22", 3000, "轉帳"),
+    income("s7", "2026-10-22", "如梭映像", "範例佩佩", "個人", "尾款", "2026-10-22", 5990, "現金"),
+    income("s8", "2026-10-22", "如梭映像", "範例佩佩", "精修", "加購", "2026-10-22", 1200, "現金"),
+    income("s9", "2026-10-12", "如梭映像", "範例攝影師", "", "租棚", "2026-10-12", 1800, "轉帳"),
+    income("s10", "2026-10-15", "如梭映像", "範例小樹", "個人", "訂金", "2027-01-16", 3000, "轉帳"),
+    income("s11", "2026-10-18", "其他", "範例儲值客", "", "儲值金", "", 30000, "轉帳", { lines: [{ date: "2026-10-28", amount: 6000, item: "第一次拍攝" }] }),
+    income("s12", "2026-10-19", "如梭映像", "範例小蝶", "個人", "訂金", "2026-11-05", 3000, "LINEPAY", { cancel: { date: "2026-10-30" } }),
+    expense("s13", "2026-10-05", "薪資", "範例員工薪資", 42000, "轉帳"),
+    expense("s14", "2026-10-05", "房租", "10月房租", 38000, "轉帳"),
+    expense("s15", "2026-10-22", "化妝師費用", "範例佩佩化妝", 1500, "轉帳", { customer: "範例佩佩", serviceDate: "2026-10-22" }),
+    expense("s16", "2026-10-12", "化妝師費用", "範例阿凱化妝訂金", 800, "轉帳", { customer: "範例阿凱", serviceDate: "2026-12-12" }),
+    expense("s17", "2026-10-14", "雜項購置", "攝影燈材", 6800, "代墊款", { advancedBy: "範例同事" }),
+    expense("s18", "2026-10-16", "廣告費", "社群廣告", 2500, "刷卡0927", { feeStatus: "set", fee: 38 }),
+    expense("s20", "2026-10-29", "執行成本", "修圖軟體月費", 1000, "刷卡0927", { feeStatus: "pending" }),
+    { id: "s19", kind: "reimburse", date: "2026-10-28", amount: 3000, method: "轉帳", advancedBy: "範例同事", desc: "歸還範例同事代墊款", note: "" },
+  ];
+  return rows;
+}
+</script>
 <script type="module">
 /* ============================================================
    設定區
@@ -194,152 +860,66 @@ body.is-dragging,body.is-dragging *{cursor:grabbing!important;user-select:none}
    2. 留 null 會進入「示範模式」，資料只存在目前這台瀏覽器
    ============================================================ */
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBvDLzuDmCdKrFafrTzY1pdz3I63ebEo-M",
-  authDomain: "timeflies-clockin.firebaseapp.com",
-  projectId: "timeflies-clockin",
-  storageBucket: "timeflies-clockin.firebasestorage.app",
-  messagingSenderId: "433828133334",
-  appId: "1:433828133334:web:dbbda9762f9ae231294c77"
+  apiKey: "AIzaSyD4NToEn4TgLUladlbITyoT2eUkwacVvmg",
+  authDomain: "timeflies-ledger.firebaseapp.com",
+  projectId: "timeflies-ledger",
+  storageBucket: "timeflies-ledger.firebasestorage.app",
+  messagingSenderId: "384966239215",
+  appId: "1:384966239215:web:8115cb23387266f1eb8c1a"
 };
-/* 範例：
-const FIREBASE_CONFIG = {
-  apiKey: "AIza...",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project",
-  appId: "1:123:web:abc"
-};
-*/
-const STUDIO_NAME  = "如梭映像";
-const EMAIL_DOMAIN = "clockin.timeflies.local";  // 帳號會轉成 帳號@這個網域 給 Firebase 用，員工不需要真的 email
-const MAX_ADMINS   = 2;
-const STALE_HOURS  = 18;  // 上班超過這麼久沒打下班，就視為忘記打卡
-const FIX_DAYS     = 45;  // 員工最多可以補打幾天前的卡（要和 firestore.rules 一致）
-const SCHED_DEFAULTS = { start: "09:30", end: "18:30", breakMin: 60, cycleStart: "" };  // 排班預設值（後台可改）
-const LEAVE_TYPES = ["休假", "例假", "休息日", "特休", "病假", "事假", "其他"];      // 休假的假別選項
+const STUDIO_NAME = "如梭映像";
 
-/* ---------- 小工具 ---------- */
-const TYPES = { in: "上班", break_start: "開始休息", break_end: "結束休息", out: "下班" };
-const WEEK = "日一二三四五六";
-const pad = n => String(n).padStart(2, "0");
-const fmtTime = d => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : "—";
-const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const fmtMonth = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-const fmtDur = ms => { const m = Math.max(0, Math.round(ms / 60000)); return `${Math.floor(m / 60)}:${pad(m % 60)}`; };
-const fmtDurLong = ms => { const m = Math.max(0, Math.round(ms / 60000)); return `${Math.floor(m / 60)} 小時 ${pad(m % 60)} 分`; };
-const toHours = ms => (ms / 3600000).toFixed(2);
+const E = window.LedgerEngine;
+const KIND_LABEL = { income: "收入", expense: "支出", refund: "退款", reimburse: "歸還代墊" };
+const money = n => (n === null || n === undefined ? "" : Math.round(n).toLocaleString("zh-TW"));
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const dayLabel = dateStr => { const d = new Date(dateStr + "T00:00:00"); return `${dateStr.slice(5)}（${WEEK[d.getDay()]}）`; };
-async function sha256(t) {
-  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
-  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
-}
-const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
-const strip = u => ({ uid: u.uid, username: u.username, displayName: u.displayName, role: u.role });
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const newId = () => `e${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+const mmdd = d => (d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : "");
+const clone = o => JSON.parse(JSON.stringify(o));
+const mergeSettings = s => {
+  const merged = { ...clone(E.DEFAULT_SETTINGS), ...(s || {}) };
+  merged.payTypes = [...new Set([...E.DEFAULT_SETTINGS.payTypes, ...merged.payTypes])];
+  return merged;
+};
 
-/* ---------- 排班小工具 ---------- */
-const parseDate = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
-const addDays = (d, n) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; };
-const toMin = t => { const [h, m] = String(t || "0:0").split(":").map(Number); return (h || 0) * 60 + (m || 0); };
-const isOvernight = s => toMin(s.end) <= toMin(s.start);
-// 排班工時 = 下班 − 上班 − 休息；下班早於上班視為跨夜班
-const shiftHours = s => { let span = toMin(s.end) - toMin(s.start); if (span <= 0) span += 1440; return Math.max(0, span - (Number(s.breakMin) || 0)) / 60; };
-const fmtH = h => String(Math.round(h * 100) / 100);
-const shiftLabel = s => `${s.start}–${s.end}${isOvernight(s) ? "（跨夜）" : ""}`;
-const PCOLORS = ["#4f8a66", "#b5674a", "#a07a22", "#3f78a0", "#8a5a9a", "#5e7d7a", "#9a5a6a"];
-const isHex = c => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
-const defaultColor = uid => { let h = 0; for (const c of String(uid)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PCOLORS[h % PCOLORS.length]; };
-// 管理員在「人員顏色」設定過的顏色優先，沒設定就用自動配色
-const pcolor = uid => isHex(S.colors[uid]) ? S.colors[uid] : defaultColor(uid);
-const byStart = (a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start);
-// schedules 集合裡同時放「班」和「休假」：kind 為 "leave" 的是休假（沒有上下班時間）
-const isLeave = s => s.kind === "leave";
-const shiftsOnly = list => list.filter(s => !isLeave(s));
-const leavesOnly = list => list.filter(isLeave);
-const leaveLabel = s => s.leaveType || "休假";
-// 居家上班：班多一個 remote: true
-const isRemote = s => !isLeave(s) && !!s.remote;
-const HOME_ICON = `<svg class="ico-home" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.2 .8 7.4h2.2V14.8h3.9v-4.3h2.2v4.3h3.9V7.4h2.2z" fill="currentColor"/></svg>`;
-const homeIcon = s => isRemote(s) ? HOME_ICON : "";
-const homePill = s => isRemote(s) ? ` <span class="pill home">${HOME_ICON}居家</span>` : "";
-// 月曆一頁從週一排到週日
-function gridRange(month) {
-  const [y, m] = month.split("-").map(Number);
-  const first = new Date(y, m - 1, 1), last = new Date(y, m, 0);
-  return { first, last, gridStart: addDays(first, -((first.getDay() + 6) % 7)), gridEnd: addDays(last, 6 - ((last.getDay() + 6) % 7)) };
-}
-// 依班表算工時提醒：單日 >10h、>12h、連續上班 7 天以上、雙週總時數 >80h
-function analyzeSchedule(list, settings) {
-  const per = {};   // uid -> { date: 當天排班工時 }
-  for (const s of shiftsOnly(list)) { (per[s.uid] ??= {}); per[s.uid][s.date] = (per[s.uid][s.date] || 0) + shiftHours(s); }
-  const dayFlags = {};   // "uid|date" -> [提醒]
-  const add = (u, d, m) => (dayFlags[u + "|" + d] ??= []).push(m);
-  for (const [u, dates] of Object.entries(per)) {
-    for (const [d, h] of Object.entries(dates)) {
-      if (h > 12) add(u, d, `當天排 ${fmtH(h)} 小時，超過含加班的 12 小時上限`);
-      else if (h > 10) add(u, d, `當天排 ${fmtH(h)} 小時，超過變形工時單日正常工時 10 小時（超過部分算加班）`);
-    }
-    let run = 0, prev = null;
-    for (const k of Object.keys(dates).sort()) {
-      run = prev && fmtDate(addDays(parseDate(prev), 1)) === k ? run + 1 : 1;
-      if (run >= 7) add(u, k, `連續上班第 ${run} 天（每 7 天至少要有 1 天例假）`);
-      prev = k;
-    }
-  }
-  const cycleFlags = [];
-  if (settings?.cycleStart) {
-    const base = parseDate(settings.cycleStart);
-    for (const [u, dates] of Object.entries(per)) {
-      const sums = {};
-      for (const [d, h] of Object.entries(dates)) { const i = Math.floor(Math.round((parseDate(d) - base) / 864e5) / 14); sums[i] = (sums[i] || 0) + h; }
-      for (const [i, h] of Object.entries(sums)) if (h > 80) { const from = addDays(base, Number(i) * 14); cycleFlags.push({ uid: u, from: fmtDate(from), to: fmtDate(addDays(from, 13)), hours: h }); }
-    }
-  }
-  return { dayFlags, cycleFlags };
-}
+const S = {
+  tab: "ledger", month: todayStr().slice(0, 7), year: +todayStr().slice(0, 4), entries: [], settings: clone(E.DEFAULT_SETTINGS),
+  me: null, ready: false, loaded: false, accessError: "", loginMsg: "", query: "", onlyFlagged: false, onlyFee: false, picked: new Set(), bookTab: "upcoming", bookQuery: "", drill: null, importState: null,
+};
+let store = null;
+let draft = null;
+let modal = null;
+const app = document.getElementById("app");
+const dlg = document.getElementById("dlg");
 
-/* ---------- 示範模式（瀏覽器本機儲存） ---------- */
+/* ---------- 資料存取：示範模式 ---------- */
 function makeDemoStore() {
-  const mem = {};
-  const get = (k, d) => { try { const v = localStorage.getItem("clockin_" + k); return v ? JSON.parse(v) : (mem[k] ?? d); } catch { return mem[k] ?? d; } };
-  const set = (k, v) => { mem[k] = v; try { localStorage.setItem("clockin_" + k, JSON.stringify(v)); } catch {} };
-  const toP = p => ({ ...p, ts: new Date(p.ts) });
-  let me = null;
+  const KEY = "timeflies-ledger-demo";
+  const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } };
+  const write = d => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch { /* 這個瀏覽器不能存，資料只留在這次開啟的畫面 */ } };
+  let data = read() || { entries: sampleEntries(), settings: null };
+  let notify = () => {};
+  const push = () => { write(data); notify(data.entries, data.settings); };
   return {
-    mode: "demo",
-    async init() { const sid = get("session", null); me = get("users", []).find(u => u.uid === sid) || null; return me && strip(me); },
-    async adminCount() { return get("users", []).filter(u => u.role === "admin").length; },
-    async signUp({ username, password, displayName, role }) {
-      const users = get("users", []);
-      if (users.some(u => u.username === username)) throw new Error("這個帳號已經有人使用");
-      if (role === "admin" && users.filter(u => u.role === "admin").length >= MAX_ADMINS) throw new Error(`管理帳號已滿 ${MAX_ADMINS} 個，無法再申請`);
-      const u = { uid: uuid(), username, displayName, role, hash: await sha256(username + ":" + password) };
-      users.push(u); set("users", users); set("session", u.uid); me = u; return strip(u);
+    demo: true,
+    start(onUser) { onUser({ name: "示範使用者" }); },
+    subscribe(cb) { notify = cb; cb(data.entries, data.settings); },
+    async signIn() {},
+    async signOut() {},
+    async put(docs) {
+      for (const d of docs) {
+        const i = data.entries.findIndex(e => e.id === d.id);
+        if (i >= 0) data.entries[i] = d; else data.entries.push(d);
+      }
+      push();
     },
-    async signIn({ username, password }) {
-      const u = get("users", []).find(x => x.username === username);
-      if (!u || u.hash !== await sha256(username + ":" + password)) throw new Error("帳號或密碼錯誤");
-      set("session", u.uid); me = u; return strip(u);
-    },
-    async signOut() { set("session", null); me = null; },
-    async addPunch(type, uid = me.uid, at = null, reason = "") {
-      const p = get("punches", []);
-      p.push({ id: uuid(), uid, type, ts: (at || new Date()).getTime(), manual: !!at, by: me.uid, reason });
-      set("punches", p);
-    },
-    async punchesFor(uid, start, end) { return get("punches", []).filter(p => p.uid === uid && p.ts >= +start && p.ts < +end).map(toP); },
-    async punchesAll(start, end) { return get("punches", []).filter(p => p.ts >= +start && p.ts < +end).map(toP); },
-    async deletePunch(id) { set("punches", get("punches", []).filter(p => p.id !== id)); },
-    async listStaff() { return get("users", []).filter(u => u.role === "staff").map(strip); },
-    async schedulesBetween(from, to) { return get("schedules", []).filter(s => s.date >= from && s.date <= to); },
-    async addSchedules(items, delIds = []) { set("schedules", [...get("schedules", []).filter(s => !delIds.includes(s.id)), ...items.map(it => ({ ...it, id: uuid(), by: me.uid }))]); },
-    async updateSchedule(id, fields) { set("schedules", get("schedules", []).map(s => s.id === id ? { ...s, ...fields, by: me.uid } : s)); },
-    async deleteSchedule(id) { set("schedules", get("schedules", []).filter(s => s.id !== id)); },
-    async getScheduleSettings() { return get("schedSettings", {}); },
-    async saveScheduleSettings(v) { set("schedSettings", v); },
+    async saveSettings(s) { data.settings = s; push(); },
+    async reset(withSample) { data = { entries: withSample ? sampleEntries() : [], settings: null }; push(); },
   };
 }
 
-/* ---------- 正式模式（Firebase） ---------- */
+/* ---------- 資料存取：正式模式（Firebase） ---------- */
 async function makeFirebaseStore(cfg) {
   const V = "10.12.2";
   const [{ initializeApp }, A, F] = await Promise.all([
@@ -347,1418 +927,866 @@ async function makeFirebaseStore(cfg) {
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`),
     import(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore.js`),
   ]);
-  const app = initializeApp(cfg);
-  const auth = A.getAuth(app);
-  const db = F.getFirestore(app);
-  const email = u => `${u}@${EMAIL_DOMAIN}`;
-  const adminsRef = F.doc(db, "meta", "admins");
-  const punchesCol = F.collection(db, "punches");
-  const schedCol = F.collection(db, "schedules");
-  const schedSettingsRef = F.doc(db, "meta", "schedule");
-  let me = null;
-
-  const loadProfile = async uid => { const s = await F.getDoc(F.doc(db, "users", uid)); return s.exists() ? { uid, ...s.data() } : null; };
-  const fromSnap = s => { const d = s.data(); return { id: s.id, uid: d.uid, type: d.type, ts: d.ts ? d.ts.toDate() : new Date(), manual: !!d.manual, by: d.by || "", reason: d.reason || "" }; };
+  const fb = initializeApp(cfg);
+  const auth = A.getAuth(fb);
+  const db = F.getFirestore(fb);
+  const entriesCol = F.collection(db, "entries");
+  const settingsRef = F.doc(db, "config", "settings");
+  const stops = [];
   const mapErr = e => {
     const c = e?.code || "";
-    if (c.includes("email-already-in-use")) return new Error("這個帳號已經有人使用");
-    if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email")) return new Error("帳號或密碼錯誤");
-    if (c.includes("weak-password")) return new Error("密碼至少要 6 個字元");
+    if (c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("user-not-found") || c.includes("invalid-email")) return new Error("信箱或密碼不對");
     if (c.includes("too-many-requests")) return new Error("嘗試太多次，請稍後再試");
-    if (c.includes("permission-denied")) return new Error("沒有權限執行這個動作");
+    if (c.includes("permission-denied")) return new Error("這個帳號沒有記帳權限，請把帳號 UID 加進 Firestore 規則");
     return e;
   };
-
   return {
-    mode: "firebase",
-    async init() { await auth.authStateReady(); if (!auth.currentUser) return null; me = await loadProfile(auth.currentUser.uid); return me && strip(me); },
-    async adminCount() { const s = await F.getDoc(adminsRef); return s.exists() ? (s.data().uids || []).length : 0; },
-    async signUp({ username, password, displayName, role }) {
-      if (role === "admin" && await this.adminCount() >= MAX_ADMINS) throw new Error(`管理帳號已滿 ${MAX_ADMINS} 個，無法再申請`);
-      let cred;
-      try { cred = await A.createUserWithEmailAndPassword(auth, email(username), password); } catch (e) { throw mapErr(e); }
-      const uid = cred.user.uid;
-      const profile = { username, displayName, role, createdAt: F.serverTimestamp() };
+    demo: false,
+    start(onUser) { A.onAuthStateChanged(auth, u => onUser(u ? { name: u.email, uid: u.uid } : null)); },
+    subscribe(cb, onErr) {
+      stops.forEach(s => s());
+      stops.length = 0;
+      let entries = [], settings = null, gotE = false, gotS = false;
+      const emit = () => { if (gotE && gotS) cb(entries, settings); };
+      stops.push(F.onSnapshot(entriesCol, s => { entries = s.docs.map(d => ({ ...d.data(), id: d.id })); gotE = true; emit(); }, e => onErr(mapErr(e))));
+      stops.push(F.onSnapshot(settingsRef, s => { settings = s.exists() ? s.data() : null; gotS = true; emit(); }, e => onErr(mapErr(e))));
+    },
+    async signIn(email, password) {
+      try { await A.signInWithEmailAndPassword(auth, email, password); } catch (e) { throw mapErr(e); }
+    },
+    async signOut() { stops.forEach(s => s()); stops.length = 0; await A.signOut(auth); },
+    async put(docs) {
+      const who = auth.currentUser?.email || "";
       try {
-        if (role === "admin") {
-          await F.runTransaction(db, async tx => {
-            const s = await tx.get(adminsRef);
-            const uids = s.exists() ? (s.data().uids || []) : [];
-            if (uids.length >= MAX_ADMINS) throw new Error(`管理帳號已滿 ${MAX_ADMINS} 個，無法再申請`);
-            if (s.exists()) tx.update(adminsRef, { uids: [...uids, uid] }); else tx.set(adminsRef, { uids: [uid] });
-            tx.set(F.doc(db, "users", uid), profile);
+        for (let i = 0; i < docs.length; i += 400) {
+          const batch = F.writeBatch(db);
+          docs.slice(i, i + 400).forEach(d => {
+            const { id, ...rest } = clone(d);
+            batch.set(F.doc(entriesCol, id), { ...rest, updatedBy: who, updatedAt: new Date().toISOString() });
           });
-        } else {
-          await F.setDoc(F.doc(db, "users", uid), profile);
+          await batch.commit();
         }
-      } catch (e) { try { await cred.user.delete(); } catch {} throw mapErr(e); }
-      me = { uid, ...profile }; return strip(me);
-    },
-    async signIn({ username, password }) {
-      try { await A.signInWithEmailAndPassword(auth, email(username), password); } catch (e) { throw mapErr(e); }
-      me = await loadProfile(auth.currentUser.uid);
-      if (!me) { await A.signOut(auth); throw new Error("找不到這個帳號的資料"); }
-      return strip(me);
-    },
-    async signOut() { await A.signOut(auth); me = null; },
-    async addPunch(type, uid = me.uid, at = null, reason = "") {
-      try {
-        await F.addDoc(punchesCol, {
-          uid, type, manual: !!at, by: auth.currentUser.uid, reason,
-          ts: at ? F.Timestamp.fromDate(at) : F.serverTimestamp(),   // 員工打卡一律用伺服器時間，不能改手機時間作弊
-        });
       } catch (e) { throw mapErr(e); }
     },
-    async punchesFor(uid, start, end) {
-      try {
-        const q = F.query(punchesCol, F.where("uid", "==", uid), F.where("ts", ">=", F.Timestamp.fromDate(start)), F.where("ts", "<", F.Timestamp.fromDate(end)));
-        return (await F.getDocs(q)).docs.map(fromSnap);
-      } catch (e) {
-        if (e.code !== "failed-precondition") throw mapErr(e);
-        console.warn("尚未建立索引，請點 Firebase 錯誤訊息中的連結建立：", e.message);
-        const q = F.query(punchesCol, F.where("uid", "==", uid));
-        return (await F.getDocs(q)).docs.map(fromSnap).filter(p => p.ts >= start && p.ts < end);
-      }
+    async saveSettings(s) {
+      try { await F.setDoc(settingsRef, clone(s)); } catch (e) { throw mapErr(e); }
     },
-    async punchesAll(start, end) {
-      const q = F.query(punchesCol, F.where("ts", ">=", F.Timestamp.fromDate(start)), F.where("ts", "<", F.Timestamp.fromDate(end)));
-      try { return (await F.getDocs(q)).docs.map(fromSnap); } catch (e) { throw mapErr(e); }
-    },
-    async deletePunch(id) { try { await F.deleteDoc(F.doc(db, "punches", id)); } catch (e) { throw mapErr(e); } },
-    async listStaff() {
-      const q = F.query(F.collection(db, "users"), F.where("role", "==", "staff"));
-      return (await F.getDocs(q)).docs.map(s => strip({ uid: s.id, ...s.data() }));
-    },
-    /* 排班：另存在 schedules 集合（一個班一筆），設定存在 meta/schedule，不動 users / punches */
-    async schedulesBetween(from, to) {
-      try {
-        const q = F.query(schedCol, F.where("date", ">=", from), F.where("date", "<=", to));
-        return (await F.getDocs(q)).docs.map(s => { const d = s.data(); return { id: s.id, uid: d.uid, name: d.name || "", date: d.date, kind: d.kind || "shift", leaveType: d.leaveType || "", start: d.start || "", end: d.end || "", breakMin: d.breakMin || 0, remote: !!d.remote }; });
-      } catch (e) { throw mapErr(e); }
-    },
-    // 新增多筆（班或休假）；delIds 是要一起刪掉的舊資料（例如設休假時刪掉當天的班），一次寫入
-    async addSchedules(items, delIds = []) {
-      const b = F.writeBatch(db);
-      for (const id of delIds) b.delete(F.doc(db, "schedules", id));
-      for (const it of items) b.set(F.doc(schedCol), { ...it, by: auth.currentUser.uid, updatedAt: F.serverTimestamp() });
-      try { await b.commit(); } catch (e) { throw mapErr(e); }
-    },
-    async updateSchedule(id, fields) {
-      try { await F.updateDoc(F.doc(db, "schedules", id), { ...fields, by: auth.currentUser.uid, updatedAt: F.serverTimestamp() }); } catch (e) { throw mapErr(e); }
-    },
-    async deleteSchedule(id) { try { await F.deleteDoc(F.doc(db, "schedules", id)); } catch (e) { throw mapErr(e); } },
-    async getScheduleSettings() { try { const s = await F.getDoc(schedSettingsRef); return s.exists() ? s.data() : {}; } catch (e) { throw mapErr(e); } },
-    async saveScheduleSettings(v) { try { await F.setDoc(schedSettingsRef, v); } catch (e) { throw mapErr(e); } },
   };
 }
 
-/* ---------- 工時計算 ----------
-   每一段「上班 → 下班」算一個班次，歸在上班那天。
-   工時 = 上班到下班，扣掉所有休息時間。
-   沒有成對的打卡會標成「異常」，方便管理員補登。 */
-function computeShifts(punches) {
-  const list = [...punches].sort((a, b) => a.ts - b.ts);
-  const shifts = [];
-  let cur = null, seg = null, brk = null;
-  const newShift = p => ({ date: fmtDate(p.ts), in: null, out: null, work: 0, brk: 0, breaks: [], punches: [], issue: "" });
-  const finish = () => { if (cur) shifts.push(cur); cur = null; seg = null; brk = null; };
+/* ---------- 小工具 ---------- */
+function toast(text) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = text; t.setAttribute("role", "status");
+  document.body.append(t);
+  setTimeout(() => t.remove(), 2600);
+}
+const who = () => S.me?.name || "";
+const opt = (list, cur, blank) => `${blank !== undefined ? `<option value="">${esc(blank)}</option>` : ""}${list.map(v => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("")}`;
+const liveEntries = () => E.live(S.entries);
+const signed = n => (n ? `<span class="${n < 0 ? "neg" : ""}">${money(n)}</span>` : `<span class="muted">–</span>`);
 
-  for (const p of list) {
-    const t = +p.ts;
-    if (p.type === "in") {
-      if (cur) { cur.issue = "沒打下班"; finish(); }
-      cur = newShift(p); cur.in = p.ts; cur.punches.push(p); seg = t; continue;
+async function save(docs, message) {
+  try { await store.put(docs); if (message) toast(message); return true; }
+  catch (e) { toast(e.message || "存檔失敗，請再試一次"); return false; }
+}
+
+async function saveFile(filename, buffer) {
+  try {
+    if (window.claude?.use) {
+      const downloads = await window.claude.use("downloads");
+      if (downloads) { await downloads.save({ filename, data: buffer }); toast(`已下載 ${filename}`); return; }
     }
-    if (!cur) { const o = newShift(p); o.punches.push(p); o.issue = "沒打上班"; if (p.type === "out") o.out = p.ts; shifts.push(o); continue; }
-    cur.punches.push(p);
-    if (p.type === "break_start") {
-      if (seg != null) { cur.work += t - seg; seg = null; }
-      if (brk == null) brk = t;
-    } else if (p.type === "break_end") {
-      if (brk != null) { cur.brk += t - brk; cur.breaks.push([new Date(brk), p.ts]); brk = null; }
-      if (seg == null) seg = t;
-    } else if (p.type === "out") {
-      if (seg != null) cur.work += t - seg;
-      if (brk != null) { cur.brk += t - brk; cur.breaks.push([new Date(brk), p.ts]); }
-      cur.out = p.ts; finish();
-    }
+    const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast(`已下載 ${filename}`);
+  } catch (e) {
+    if (e?.code !== "declined") toast("下載沒有完成，請再試一次");
   }
-  if (cur) {
-    const lastT = +cur.punches[cur.punches.length - 1].ts;
-    if (Date.now() - lastT < STALE_HOURS * 3600e3) { cur.ongoing = true; cur.openSeg = seg; cur.openBrk = brk; }
-    else cur.issue = "沒打下班";
-    shifts.push(cur);
-  }
-  return shifts;
 }
-const liveWork = s => s.work + (s.ongoing && s.openSeg != null ? Date.now() - s.openSeg : 0);
-const liveBrk  = s => s.brk  + (s.ongoing && s.openBrk != null ? Date.now() - s.openBrk : 0);
 
-/* ---------- 狀態 ---------- */
-const S = {
-  store: null, me: null,
-  role: "staff", mode: "signin", msg: null, busy: false, adminLeft: MAX_ADMINS,
-  mine: [], myMonth: fmtMonth(new Date()), myShifts: null, fixMsg: null,
-  month: fmtMonth(new Date()), admin: null, selected: null, open: new Set(), adminMsg: null,
-  // 排班
-  adminTab: "attendance", sched: null, day: null, schedMsg: null,
-  crew: null, offToday: [], myUpcoming: [], crewErr: null,
-  colors: {},   // uid -> 顏色（存在 meta/schedule 的 colors）
-  dropAsk: null,   // 拖曳班次放開後，詢問複製還是移動 { s, to, note }
-  calHide: { admin: new Set(), staff: new Set() },
-  calView: { admin: "all", staff: "all" },   // 月曆顯示：all 全部 / work 只看上班 / off 只看休假   // 月曆上暫時關掉不看的人（各自存在自己的瀏覽器）
-  staffCal: { month: fmtMonth(new Date()), list: null, sel: fmtDate(new Date()), err: null },   // 前台月班表
-};
-const app = document.getElementById("app");
+async function download(type) {
+  if (!window.ExcelJS) { toast("Excel 工具還沒載入，請確認網路後重新整理"); return; }
+  const wb = type === "pnl" ? E.workbookPnL(ExcelJS, S.entries, S.settings, S.year) : E.workbookCash(ExcelJS, S.entries, S.settings, S.year);
+  await saveFile(`${STUDIO_NAME}_${type === "pnl" ? "損益表" : "現金流量表"}_${S.year}.xlsx`, await wb.xlsx.writeBuffer());
+}
 
-function setMsg(text, kind = "err") { S.msg = text ? { text, kind } : null; }
+/* ---------- 流水帳 ---------- */
+function monthSummary() {
+  const y = +S.month.slice(0, 4), i = +S.month.slice(5, 7) - 1;
+  const pnl = E.buildPnL(S.entries, S.settings, y);
+  const cash = E.buildCash(S.entries, S.settings, y);
+  const of = (r, k) => r.rows.find(x => x.key === k).values[i];
+  const owed = Object.values(E.advanceOwed(S.entries, null, S.settings)).reduce((s, x) => s + x, 0);
+  return { cash: of(cash, "netCash"), net: of(pnl, "net"), revenue: of(pnl, "totalRev"), deferred: of(pnl, "deferred"), owed };
+}
 
-/* ---------- 畫面：登入 / 申請 ---------- */
-function viewLogin() {
-  const isAdmin = S.role === "admin";
-  const signup = S.mode === "signup";
-  const full = isAdmin && S.adminLeft <= 0;
+function viewLedger() {
+  const sum = monthSummary();
+  const settled = E.live(E.settle(S.entries, S.settings));
+  const q = S.query.trim().toLowerCase();
+  let rows = q ? settled : settled.filter(e => e.date.startsWith(S.month));
+  const flagged = settled.filter(e => e.flags?.length);
+  if (!flagged.length) S.onlyFlagged = false;
+  const noDate = liveEntries().filter(E.reparseEntry).length;
+  if (S.onlyFlagged) rows = flagged;
+  const feeList = settled.filter(E.feePending);
+  if (!feeList.length) S.onlyFee = false;
+  if (S.onlyFee) rows = feeList;
+  if (q) rows = rows.filter(e => [e.desc, e.customer, e.brand, e.category, e.method, e.note].join(" ").toLowerCase().includes(q));
+  rows.sort((a, b) => (q ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)));
+  const selectable = rows.filter(E.canConfirm);
+  const pickedCount = selectable.filter(e => S.picked.has(e.id)).length;
+  const body = rows.map(e => {
+    const pnl = E.ledgerRows([e], null, S.settings)[0]?.pnlMonth || E.ym(e.date);
+    const shifted = pnl && pnl !== E.ym(e.date);
+    return `<tr class="click" data-act="edit" data-id="${esc(e.id)}">
+      ${S.onlyFlagged ? `<td data-act="noop">${E.canConfirm(e)
+        ? `<input type="checkbox" class="flag-pick" value="${esc(e.id)}"${S.picked.has(e.id) ? " checked" : ""} aria-label="選取 ${esc(e.desc)}">`
+        : `<span class="small muted">先填</span>`}</td>` : ""}
+      <td class="num">${q ? esc(e.date.replace(/-/g, "/")) : mmdd(e.date)}</td>
+      <td>${esc(e.kind === "income" ? e.brand : e.kind === "expense" ? e.category : KIND_LABEL[e.kind])}</td>
+      <td class="wide">${esc(e.desc)}${e.flags?.length ? ` <span class="pill warn">待確認</span>` : ""}${e.cancel ? ` <span class="pill bad">已取消</span>` : ""}${E.feePending(e) ? ` <span class="pill bad">手續費未填</span>` : ""}${e.feeOf ? ` <span class="pill off">自動拆出</span>` : ""}<div class="small muted">${esc([e.advanceRepaid ? `含代墊款 ${money(e.advanceRepaid)}，薪資費用 ${money(e.amount - e.advanceRepaid)}` : "", ...(e.flags || [])].filter(Boolean).join("；"))}</div></td>
+      <td class="num">${e.kind === "income" ? money(e.amount) : ""}</td>
+      <td class="num">${e.kind !== "income" ? money(e.amount) : ""}</td>
+      <td>${e.method ? esc(e.method) : `<span class="pill warn">未填</span>`}${e.advancedBy ? `<div class="small muted">${esc(e.advancedBy)}</div>` : ""}</td>
+      <td>${shifted ? `<span class="pill soft">${esc(pnl.replace(/\d\d(\d\d)-(\d\d)/g, "$1/$2"))}</span>` : `<span class="muted small">同月</span>`}</td>
+    </tr>`;
+  }).join("");
   return `
-  <div class="wrap narrow">
-    <div style="text-align:center;margin:28px 0 8px">
-      <h1>${esc(STUDIO_NAME)} 打卡系統</h1>
-      <div class="muted small">${isAdmin ? "管理後台" : "員工打卡"}</div>
-    </div>
-    <div class="card">
-      <div class="seg" style="margin-top:0">
-        <button data-act="role" data-v="staff" class="${!isAdmin ? "on" : ""}">員工</button>
-        <button data-act="role" data-v="admin" class="${isAdmin ? "on" : ""}">管理員</button>
+  <div class="stats">
+    <div class="stat"><span>本月現金淨流入</span><b class="${sum.cash < 0 ? "neg" : ""}">${money(sum.cash)}</b><small>實際進出的錢</small></div>
+    <div class="stat"><span>本月損益</span><b class="${sum.net < 0 ? "neg" : ""}">${money(sum.net)}</b><small>認列收入 ${money(sum.revenue)}</small></div>
+    <div class="stat"><span>月底預收款</span><b>${money(sum.deferred)}</b><small>已收、服務還沒做</small></div>
+    <div class="stat"><span>未還代墊款</span><b>${money(sum.owed)}</b><small>全部代墊人合計</small></div>
+  </div>
+  <div class="card">
+    <div class="row spread" style="margin-bottom:10px">
+      <div class="ctrl">
+        <input type="month" id="f-month" value="${esc(S.month)}" aria-label="月份">
+        <input type="search" id="f-query" placeholder="搜尋全部月份" value="${esc(S.query)}" aria-label="搜尋">
+        ${S.onlyFee ? `<button class="btn tiny" data-act="toggleFee">看全部</button>` : ""}
+        ${flagged.length && !S.onlyFee ? `<button class="btn tiny" data-act="toggleFlag">${S.onlyFlagged ? "看全部" : `待確認 ${flagged.length} 筆`}</button>` : ""}
+        ${S.onlyFlagged && selectable.length ? `<button class="btn tiny primary" data-act="confirmFlags" id="confirm-flags"${pickedCount ? "" : " disabled"}>確認選取 ${pickedCount} 筆</button>` : ""}
+        ${noDate ? `<button class="btn tiny" data-act="reparse" id="reparse">重新判讀 ${noDate} 筆收入月份</button>` : ""}
       </div>
-      <h2>${signup ? (isAdmin ? "申請管理帳號" : "申請員工帳號") : "登入"}</h2>
-      ${signup && isAdmin ? `<div class="small ${full ? "" : "muted"}" style="${full ? "color:var(--bad)" : ""}">${full ? `管理帳號已滿 ${MAX_ADMINS} 個，無法再申請。` : `管理帳號上限 ${MAX_ADMINS} 個，目前還能申請 ${S.adminLeft} 個。`}</div>` : ""}
-      <form id="authForm" autocomplete="on">
-        ${signup ? `<label>姓名（後台顯示用）</label><input name="displayName" required maxlength="20" placeholder="例如：小美">` : ""}
-        <label>帳號</label>
-        <input name="username" required autocomplete="username" placeholder="英文、數字，3–20 字" pattern="[A-Za-z0-9_.\\-]{3,20}">
-        <label>密碼</label>
-        <input name="password" type="password" required minlength="6" autocomplete="${signup ? "new-password" : "current-password"}" placeholder="至少 6 個字元">
-        ${signup ? `<label>再輸入一次密碼</label><input name="password2" type="password" required minlength="6" autocomplete="new-password">` : ""}
-        <button class="btn primary block" ${S.busy || (signup && full) ? "disabled" : ""}>${S.busy ? "處理中…" : signup ? "申請並登入" : "登入"}</button>
-      </form>
-      ${S.msg ? `<div class="msg ${S.msg.kind}">${esc(S.msg.text)}</div>` : ""}
-      <p class="small muted" style="text-align:center;margin:16px 0 0">
-        ${signup ? `已經有帳號了？<button class="link" data-act="mode" data-v="signin">登入</button>` : `還沒有帳號？<button class="link" data-act="mode" data-v="signup">申請${isAdmin ? "管理" : ""}帳號</button>`}
-      </p>
+      <button class="btn primary" data-act="add" id="add-entry">新增一筆</button>
     </div>
+    ${q && rows.length ? `<p class="small muted" style="margin:0 0 6px">搜尋全部月份，找到 ${rows.length} 筆，新的在前。</p>` : ""}
+    ${rows.length ? `<div class="tablewrap"><table>
+      <thead><tr>${S.onlyFlagged ? `<th><input type="checkbox" id="flag-all" aria-label="全選可確認的項目"${selectable.length && selectable.every(e => S.picked.has(e.id)) ? " checked" : ""}></th>` : ""}<th>日期</th><th>項目</th><th>細項</th><th class="num">收入</th><th class="num">支出</th><th>金流</th><th>損益月份</th></tr></thead>
+      <tbody>${body}</tbody></table></div>` : `<div class="empty">${q ? "找不到符合的紀錄。" : "這個月還沒有紀錄。按「新增一筆」開始登記，或到設定匯入現有 Excel。"}</div>`}
   </div>`;
 }
 
-/* ---------- 畫面：員工打卡 ---------- */
-function staffState() {
-  const shifts = computeShifts(S.mine);
-  const last = shifts[shifts.length - 1];
-  if (!last || !last.ongoing) return { state: "off", shifts };
-  return { state: last.openBrk != null ? "break" : "work", shifts, current: last };
+/* ---------- 預約 ---------- */
+function bookingStatus(b) {
+  if (b.cancelled) return b.refunded ? `<span class="pill bad">取消，退 ${money(b.refunded)}</span>` : `<span class="pill bad">取消，訂金不退</span>`;
+  if (b.serviceDate > todayStr()) return `<span class="pill soft">未服務</span>`;
+  return `<span class="pill ok">已服務</span>`;
 }
 
-function viewStaff() {
-  const { state, shifts, current } = staffState();
-  const now = new Date();
-  const today = fmtDate(now), month = fmtMonth(now);
-  const todayShifts = shifts.filter(s => s.date === today);
-  const monthShifts = shifts.filter(s => s.date.startsWith(month));
-  const todayWork = todayShifts.reduce((a, s) => a + liveWork(s), 0);
-  const monthWork = monthShifts.reduce((a, s) => a + liveWork(s), 0);
-  const monthDays = new Set(monthShifts.filter(s => s.in).map(s => s.date)).size;
-  const todayPunches = S.mine.filter(p => fmtDate(p.ts) === today).sort((a, b) => b.ts - a.ts);
-  const pill = { off: `<span class="pill off">未上班</span>`, work: `<span class="pill work">工作中</span>`, break: `<span class="pill break">休息中</span>` }[state];
-  const can = { in: state === "off", break_start: state === "work", break_end: state === "break", out: state !== "off" };
-  const next = { off: "in", work: "out", break: "break_end" }[state];
-
-  return `
-  <div class="wrap mid">
-    <div class="top">
-      <div><h1>嗨，${esc(S.me.displayName)}</h1><div class="muted small">${now.getFullYear()} 年 ${now.getMonth() + 1} 月 ${now.getDate()} 日 星期${WEEK[now.getDay()]}</div></div>
-      <button class="btn" data-act="logout">登出</button>
-    </div>
-    <div class="card clock">
-      ${pill}
-      <div class="time" id="clock">${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}</div>
-      ${current ? `<div class="muted small">今天 ${fmtTime(current.in)} 上班</div>` : `<div class="muted small">&nbsp;</div>`}
-      <div class="punch">
-        ${Object.entries(TYPES).map(([k, v]) => `<button data-act="punch" data-v="${k}" class="${k === next ? "go" : ""}" ${!can[k] || S.busy ? "disabled" : ""}>${v}</button>`).join("")}
-      </div>
-      ${S.msg ? `<div class="msg ${S.msg.kind}">${esc(S.msg.text)}</div>` : ""}
-    </div>
-    <div class="stats">
-      <div class="stat"><span class="muted small">今日工時</span><b>${fmtDur(todayWork)}</b></div>
-      <div class="stat"><span class="muted small">本月工時</span><b>${fmtDur(monthWork)}</b></div>
-      <div class="stat"><span class="muted small">本月出勤</span><b>${monthDays} 天</b></div>
-    </div>
-    ${viewCrew()}
-    ${viewStaffCal()}
-    <div class="card">
-      <h2>今天的打卡紀錄</h2>
-      ${todayPunches.length ? `<ul class="list">${todayPunches.map(p => `<li><span>${TYPES[p.type]}${p.manual ? ` <span class="muted small">（${manualLabel(p)}）</span>` : ""}</span><b>${fmtTime(p.ts)}</b></li>`).join("")}</ul>` : `<div class="empty">今天還沒有打卡</div>`}
-    </div>
-    ${viewMyMonth()}
-    ${viewFixForm()}
-  </div>`;
-}
-
-/* 前台：今天上班的人員 + 我接下來的班 */
-/* 24 小時制時間選擇：時（00–23）、分（每 5 分鐘）兩個下拉，實際值放在同名的隱藏欄位 */
-function timePicker(name, value) {
-  const [h, m] = /^\d{2}:\d{2}$/.test(value || "") ? value.split(":") : ["09", "30"];
-  const hours = Array.from({ length: 24 }, (_, i) => pad(i));
-  const mins = Array.from({ length: 12 }, (_, i) => pad(i * 5));
-  if (!mins.includes(m)) { mins.push(m); mins.sort(); }   // 舊資料不是 5 分鐘整數也保留
-  const opts = (arr, cur) => arr.map(v => `<option${v === cur ? " selected" : ""}>${v}</option>`).join("");
-  return `<div class="tp">
-    <select data-tp="h" aria-label="時">${opts(hours, h)}</select><span>:</span>
-    <select data-tp="m" aria-label="分">${opts(mins, m)}</select>
-    <input type="hidden" name="${name}" value="${h}:${m}">
-  </div>`;
-}
-
-/* 月曆上方的人員開關：點名字隱藏／顯示那個人的班（只影響自己看到的畫面） */
-const hideKey = where => `clockin_hide_${where}_${S.me?.uid || ""}`;
-function loadHidden(where) { try { return new Set(JSON.parse(localStorage.getItem(hideKey(where)) || "[]")); } catch { return new Set(); } }
-function saveHidden(where) { try { localStorage.setItem(hideKey(where), JSON.stringify([...S.calHide[where]])); } catch {} }
-function viewPeopleFilter(where, people) {
-  if (!people.length) return "";
-  const hid = S.calHide[where];
-  const nHidden = people.filter(p => hid.has(p.uid)).length;
-  return `<div class="pfilter">
-    ${people.map(p => {
-      const on = !hid.has(p.uid);
-      return `<button type="button" data-act="pf" data-w="${where}" data-v="${esc(p.uid)}" class="${on ? "on" : "off-name"}" style="--pc:${pcolor(p.uid)}" aria-pressed="${on}" title="${on ? "點一下隱藏" : "點一下顯示"}"><i class="sw"></i><span>${esc(p.name)}</span></button>`;
-    }).join("")}
-    ${where === "staff" ? `<button type="button" class="ctl" data-act="pf" data-w="staff" data-v="__me">只看我</button>` : ""}
-    ${nHidden ? `<button type="button" class="ctl" data-act="pf" data-w="${where}" data-v="__all">全部顯示</button>` : ""}
-  </div>`;
-}
-
-/* 月曆共用：一格最多顯示幾個人、全部／上班／休假切換、全員休假 */
-const MAX_CHIPS = 5;
-const viewKey = where => `clockin_view_${where}_${S.me?.uid || ""}`;
-function loadView(where) { try { const v = localStorage.getItem(viewKey(where)); return ["all", "work", "off"].includes(v) ? v : "all"; } catch { return "all"; } }
-function saveView(where) { try { localStorage.setItem(viewKey(where), S.calView[where]); } catch {} }
-function viewModeBar(where) {
-  const cur = S.calView[where];
-  const b = (k, label) => `<button type="button" data-act="cv" data-w="${where}" data-v="${k}" class="${cur === k ? "on" : ""}">${label}</button>`;
-  return `<div><div class="seg vseg">${b("all", "全部")}${b("work", "上班")}${b("off", "休假")}</div></div>`;
-}
-const byMode = (where, items) => S.calView[where] === "work" ? shiftsOnly(items) : S.calView[where] === "off" ? leavesOnly(items) : items;
-// 全員休假：這天沒有人上班，而且名單上每個人都有請假
-function isAllOff(dayAll, roster) {
-  if (!roster.length || shiftsOnly(dayAll).length) return false;
-  const off = new Set(leavesOnly(dayAll).map(s => s.uid));
-  return roster.every(uid => off.has(uid));
-}
-const leaveChip = (s, name, extra = "", draggable = false) => `<div class="sc off${extra}"${draggable ? ` data-sid="${esc(s.id)}"` : ""} title="${esc(`${name} ${leaveLabel(s)}`)}">${esc(name)} 休</div>`;
-const ALL_OFF_CHIP = `<div class="sc off alloff">全員休假</div>`;
-function dayCount(where, items) {
-  const n = S.calView[where] === "off" ? leavesOnly(items).length : shiftsOnly(items).length;
-  return n ? `<span>${n} ${S.calView[where] === "off" ? "休" : "人"}</span>` : "";
-}
-
-/* 前台：整個月的班表（只能看，不能改） */
-function viewStaffCal() {
-  const C = S.staffCal;
-  const { first, gridStart, gridEnd } = gridRange(C.month);
-  const today = fmtDate(new Date());
-  const byDate = {}, allByDate = {};
-  const hid = S.calHide.staff;
-  for (const s of C.list || []) { (allByDate[s.date] ??= []).push(s); if (!hid.has(s.uid)) (byDate[s.date] ??= []).push(s); }
-  // 開關列：本月有出現的人（自己排第一個）
-  const seen = new Map();
-  for (const s of [...(C.list || [])].sort((a, b) => (a.uid === S.me.uid ? -1 : b.uid === S.me.uid ? 1 : (a.name || "").localeCompare(b.name || "", "zh-Hant"))))
-    if (!seen.has(s.uid)) seen.set(s.uid, { uid: s.uid, name: s.name || "（未知）" });
-  if (!seen.has(S.me.uid)) seen.set(S.me.uid, { uid: S.me.uid, name: S.me.displayName });
-  const roster = [...seen.keys()];
-  const sortDay = arr => [...shiftsOnly(arr).sort(byStart), ...leavesOnly(arr).sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"))];
-  let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
-  for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
-    const k = fmtDate(d);
-    const allOff = isAllOff(allByDate[k] || [], roster);
-    const items = allOff ? [] : byMode("staff", sortDay(byDate[k] || []));
-    const chips = allOff ? ALL_OFF_CHIP : items.slice(0, MAX_CHIPS).map(s => {
-      const me = s.uid === S.me.uid ? " me" : "";
-      return isLeave(s)
-        ? leaveChip(s, s.name || "（未知）", me)
-        : `<div class="sc${me}" style="--pc:${pcolor(s.uid)}"${isRemote(s) ? ` title="居家上班"` : ""}>${homeIcon(s)}${esc(s.name || "（未知）")} <span class="t">${s.start}–${s.end}</span></div>`;
-    }).join("");
-    cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}${k === C.sel ? " sel" : ""}" data-act="cday" data-v="${k}">
-      <div class="dnum">${d.getDate()}${allOff ? "" : dayCount("staff", items)}</div>
-      ${chips}${items.length > MAX_CHIPS ? `<div class="more">+${items.length - MAX_CHIPS}</div>` : ""}
-    </div>`;
-  }
-  // 選到的那天：完整名單和時間
-  const selItems = sortDay(byDate[C.sel] || []);
-  const selWork = shiftsOnly(selItems), selOff = leavesOnly(selItems);
-  const mode = S.calView.staff;
-  const selAllOff = isAllOff(allByDate[C.sel] || [], roster);
-  const detail = !C.sel ? "" : `
-    <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-      <h2 style="font-size:15px;margin:0 0 4px">${dayLabel(C.sel)}${C.sel === today ? "・今天" : ""}${selAllOff ? ` <span class="pill off">全員休假</span>` : ""}</h2>
-      ${mode === "off" ? "" : selWork.length ? `<ul class="list">${selWork.map(s => `<li><span class="rowl who">
-          <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
-          <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}${homePill(s)}</span></span>
-          <b>${shiftLabel(s)}</b></li>`).join("")}</ul>` : `<div class="small muted" style="padding:8px 0">這天沒有人排班</div>`}
-      ${mode === "work" ? "" : selOff.length ? `<div class="small muted" style="margin-top:6px">休假：${selOff.map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}（${esc(leaveLabel(s))}）`).join("、")}</div>`
-        : mode === "off" ? `<div class="small muted" style="padding:8px 0">這天沒有人休假</div>` : ""}
-    </div>`;
-  return `
-  <div class="card" style="margin-bottom:16px">
-    <div class="cardhead">
-      <h2>${first.getFullYear()} 年 ${first.getMonth() + 1} 月班表</h2>
-      <div style="display:flex;gap:6px">
-        <button class="btn sm" data-act="cmonth" data-v="-1" aria-label="上個月">‹</button>
-        <button class="btn sm" data-act="cmonth" data-v="0">本月</button>
-        <button class="btn sm" data-act="cmonth" data-v="1" aria-label="下個月">›</button>
-      </div>
-    </div>
-    ${C.err ? `<div class="empty">${esc(C.err)}</div>` : !C.list ? `<div class="empty">讀取中…</div>` : `
-      ${viewModeBar("staff")}
-      ${viewPeopleFilter("staff", [...seen.values()])}
-      <div class="cal compact">${cells}</div>
-      <p class="small muted" style="margin:8px 0 0">點任一天可以看那天誰上班、幾點到幾點。粗框是你自己的班，有小房子的是居家上班。</p>
-      ${detail}`}
-  </div>`;
-}
-
-function viewCrew() {
-  const crew = S.crew;
-  const today = fmtDate(new Date());
-  const weekEnd = fmtDate(addDays(new Date(), 7));   // 有整月班表了，這裡只列接下來 7 天
-  const upcoming = S.myUpcoming.filter(s => s.date !== today && s.date <= weekEnd);
-  const crewHtml = !crew ? `<div class="empty">讀取中…</div>`
-    : S.crewErr ? `<div class="empty">${esc(S.crewErr)}</div>`
-    : !crew.length ? `<div class="empty">今天沒有排班</div>`
-    : `<ul class="list">${crew.map(s => `<li><span class="rowl who">
-        <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
-        <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}${homePill(s)}</span></span>
-        <b>${shiftLabel(s)}</b></li>`).join("")}</ul>`;
-  const off = (S.offToday || []).map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}`);
-  return `
-  <div class="card" style="margin-bottom:16px">
-    <h2>今天上班的人員</h2>
-    ${crewHtml}
-    ${off.length ? `<div class="small muted" style="margin-top:10px">今天休假：${off.join("、")}</div>` : ""}
-    ${upcoming.length ? `<h2 style="font-size:15px;margin:18px 0 4px">我接下來的班</h2>
-      <ul class="list">${upcoming.map(s => `<li><span>${dayLabel(s.date)}</span>${isLeave(s) ? `<span class="pill off">${esc(leaveLabel(s))}</span>` : `<span>${homePill(s)} <b>${shiftLabel(s)}</b></span>`}</li>`).join("")}</ul>` : ""}
-  </div>`;
-}
-
-function viewMyMonth() {
-  const sh = S.myShifts;
-  const work = sh ? sh.reduce((a, s) => a + liveWork(s), 0) : 0;
-  const brk = sh ? sh.reduce((a, s) => a + liveBrk(s), 0) : 0;
-  const days = sh ? new Set(sh.filter(s => s.in).map(s => s.date)).size : 0;
-  return `
-  <div class="card" style="margin-top:16px">
-    <div class="cardhead">
-      <h2>我的打卡明細</h2>
-      <input type="month" id="myMonthPick" value="${S.myMonth}" max="${fmtMonth(new Date())}">
-    </div>
-    ${!sh ? `<div class="empty">讀取中…</div>` : `
-      <div class="small muted" style="margin-bottom:8px">出勤 <b style="color:var(--ink)">${days}</b> 天・工時 <b style="color:var(--ink)">${fmtDurLong(work)}</b>（${toHours(work)} 小時）・休息 ${fmtDur(brk)}</div>
-      ${shiftTable(sh, "me", p => p.manual && p.by === S.me.uid)}
-      <p class="small muted" style="margin:10px 0 0">點任一天可以看原始打卡。自己補登的紀錄如果打錯，可以在那裡刪除。</p>`}
-  </div>`;
-}
-
-function viewFixForm() {
-  const now = new Date();
-  const min = new Date(); min.setDate(min.getDate() - FIX_DAYS + 1);
-  return `
-  <div class="card" style="margin-top:16px">
-    <h2 style="margin-bottom:4px">補打卡</h2>
-    <div class="small muted">忘記打卡時，選擇日期和時間補上。補登的紀錄會標示給管理員看，可以補 ${FIX_DAYS} 天內的卡。</div>
-    <form id="fixForm">
-      <label>打卡類型</label>
-      <select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
-      <div class="two">
-        <div><label>日期</label><input type="date" name="date" required value="${fmtDate(now)}" min="${fmtDate(min)}" max="${fmtDate(now)}"></div>
-        <div><label>時間</label><input type="time" name="time" required></div>
-      </div>
-      <label>原因（選填）</label>
-      <input name="reason" maxlength="50" placeholder="例如：忘記打下班、手機沒電">
-      <button class="btn primary block" ${S.busy ? "disabled" : ""}>送出補打卡</button>
-    </form>
-    ${S.fixMsg ? `<div class="msg ${S.fixMsg.kind}">${esc(S.fixMsg.text)}</div>` : ""}
-  </div>`;
-}
-
-/* 每日明細表（前台、後台共用） */
-const manualLabel = p => !p.manual ? "" : (p.by && p.by === p.uid ? "員工補登" : "管理員補登");
-function shiftTable(shifts, keyPrefix, canDelete) {
-  if (!shifts.length) return `<div class="empty">這個月沒有打卡紀錄</div>`;
-  return `<div class="tablewrap"><table>
-    <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>休息時段</th><th class="right">休息</th><th class="right">工時</th><th>狀態</th></tr></thead>
-    <tbody>
-    ${shifts.map((s, i) => {
-      const key = keyPrefix + ":" + i;
-      const st = (s.ongoing ? `<span class="pill work">進行中</span>` : s.issue ? `<span class="pill bad">${s.issue}</span>` : `<span class="muted small">正常</span>`)
-        + (s.punches.some(p => p.manual) ? ` <span class="pill break">含補登</span>` : "");
-      const row = `<tr class="click" data-act="toggle" data-v="${esc(key)}">
-        <td>${dayLabel(s.date)}</td><td>${fmtTime(s.in)}</td><td>${fmtTime(s.out)}</td>
-        <td class="small">${s.breaks.length ? s.breaks.map(b => `${fmtTime(b[0])}–${fmtTime(b[1])}`).join("、") : `<span class="muted">—</span>`}</td>
-        <td class="right">${fmtDur(liveBrk(s))}</td><td class="right"><b>${fmtDur(liveWork(s))}</b></td><td>${st}</td></tr>`;
-      const raw = S.open.has(key) ? `<tr class="raw"><td colspan="7"><span class="small muted">原始打卡：</span>${s.punches.map(p =>
-        `<span class="chip">${TYPES[p.type]} ${fmtTime(p.ts)}${p.manual ? `（${manualLabel(p)}${p.reason ? `：${esc(p.reason)}` : ""}）` : ""}${canDelete(p) ? `<button title="刪除" data-act="del" data-v="${esc(p.id)}">✕</button>` : ""}</span>`).join("")}</td></tr>` : "";
-      return row + raw;
-    }).join("")}
-    </tbody>
-  </table></div>`;
-}
-
-/* ---------- 畫面：管理後台 ---------- */
-function viewAdmin() {
-  const A = S.admin;
-  const isSched = S.adminTab === "schedule";
+function viewBookings() {
+  const seg = [["upcoming", "未服務"], ["done", "已服務"], ["cancelled", "已取消"], ["stored", "儲值金"]];
+  const today = todayStr();
+  const q = S.bookQuery.trim().toLowerCase();
   let body;
-  if (isSched) body = viewSchedule();
-  else if (!A) body = `<div class="card"><div class="empty">讀取中…</div></div>`;
-  else if (S.selected) body = viewDetail(A.rows.find(r => r.user.uid === S.selected));
-  else body = viewSummary(A);
-  const msg = isSched ? S.schedMsg : S.adminMsg;
-  return `
-  <div class="wrap">
-    <div class="top">
-      <div><h1>管理後台</h1><div class="muted small">${esc(S.me.displayName)}・管理員</div></div>
-      <button class="btn" data-act="logout">登出</button>
+  if (S.bookTab === "stored") {
+    const list = E.storedValues(S.entries);
+    body = list.length ? list.map(s => `
+      <div class="booking">
+        <div class="d">${mmdd(s.entry.date)}</div>
+        <div><b>${esc(s.entry.customer)}</b> <span class="pill ${s.left ? "soft" : "off"}">餘額 ${money(s.left)}</span>
+          <div class="pay">儲值 ${money(s.entry.amount)}，已使用 ${money(s.used)}${(s.entry.lines || []).map(l => `｜${mmdd(l.date)} ${money(l.amount)}${l.item ? ` ${esc(l.item)}` : ""}`).join("")}</div></div>
+        <div class="act"><button class="btn tiny" data-act="useStored" data-id="${esc(s.entry.id)}">記一次使用</button></div>
+      </div>`).join("") : `<div class="empty">目前沒有儲值金。登記收入時類型選「儲值金」就會出現在這裡。</div>`;
+  } else {
+    let list = E.bookings(S.entries);
+    if (S.bookTab === "cancelled") list = list.filter(b => b.cancelled);
+    else if (S.bookTab === "upcoming") list = list.filter(b => !b.cancelled && b.serviceDate > today);
+    else list = list.filter(b => !b.cancelled && b.serviceDate <= today).reverse();
+    if (q) list = list.filter(b => b.customer.toLowerCase().includes(q));
+    body = list.length ? list.map(b => `
+      <div class="booking">
+        <div class="d">${esc(b.serviceDate)}</div>
+        <div><b>${esc(b.customer || "未填客人")}</b> <span class="muted small">${esc(b.brand)}</span> ${bookingStatus(b)}
+          ${b.entries.some(e => e.history?.some(h => h.action === "改期")) ? `<span class="pill off">已改期</span>` : ""}
+          <div class="pay">${b.entries.map(e => `${esc(e.payType)} ${money(e.amount)}（${mmdd(e.date)} 收）`).join("｜")}</div></div>
+        <div class="act">${b.cancelled
+          ? `<button class="btn tiny" data-act="undoCancel" data-key="${esc(b.key)}">復原取消</button>`
+          : `<button class="btn tiny" data-act="move" data-key="${esc(b.key)}">改期</button><button class="btn tiny danger" data-act="cancel" data-key="${esc(b.key)}">取消</button>`}</div>
+      </div>`).join("") : `<div class="empty">${q ? "找不到這位客人。" : "這個分類目前沒有預約。"}</div>`;
+  }
+  return `<div class="card">
+    <div class="row spread" style="margin-bottom:10px">
+      <div class="seg">${seg.map(([k, l]) => `<button class="${S.bookTab === k ? "on" : ""}" data-act="bookTab" data-v="${k}">${l}</button>`).join("")}</div>
+      ${S.bookTab === "stored" ? "" : `<div class="ctrl"><input type="search" id="f-book" placeholder="搜尋客人" value="${esc(S.bookQuery)}" aria-label="搜尋客人"></div>`}
     </div>
-    <div class="seg tabs">
-      <button data-act="atab" data-v="attendance" class="${!isSched ? "on" : ""}">出勤總覽</button>
-      <button data-act="atab" data-v="schedule" class="${isSched ? "on" : ""}">排班表</button>
-    </div>
-    <div class="toolbar">
-      <label style="margin:0">月份</label>
-      <input type="month" id="monthPick" value="${S.month}">
-      <button class="btn" data-act="reload">重新整理</button>
-      <span style="flex:1"></span>
-      ${isSched ? "" : `<button class="btn" data-act="csv" ${!A ? "disabled" : ""}>匯出 CSV</button>`}
-    </div>
-    ${msg ? `<div class="msg ${msg.kind}" style="margin:0 0 12px">${esc(msg.text)}</div>` : ""}
     ${body}
-  </div>
-  ${isSched && S.day ? viewDayModal() : ""}
-  ${isSched && S.dropAsk ? viewDropModal() : ""}`;
-}
-
-function viewSummary(A) {
-  if (!A.rows.length) return `<div class="card"><div class="empty">還沒有員工帳號。請員工到前台「申請員工帳號」。</div></div>`;
-  const tot = A.rows.reduce((a, r) => ({ work: a.work + r.work, brk: a.brk + r.brk, days: a.days + r.days, issues: a.issues + r.issues }), { work: 0, brk: 0, days: 0, issues: 0 });
-  return `
-  <div class="card">
-    <h2>${S.month.replace("-", " 年 ")} 月・全員總覽</h2>
-    <div class="tablewrap"><table>
-      <thead><tr><th>姓名</th><th>帳號</th><th class="right">出勤天數</th><th class="right">總工時</th><th class="right">（小時）</th><th class="right">總休息</th><th class="right">員工補登</th><th class="right">異常</th></tr></thead>
-      <tbody>
-        ${A.rows.map(r => `<tr class="click" data-act="pick" data-v="${esc(r.user.uid)}">
-          <td><b>${esc(r.user.displayName)}</b></td><td class="muted">${esc(r.user.username)}</td>
-          <td class="right">${r.days}</td><td class="right"><b>${fmtDur(r.work)}</b></td><td class="right muted">${toHours(r.work)}</td>
-          <td class="right">${fmtDur(r.brk)}</td>
-          <td class="right">${r.fixes ? `<span class="pill break">${r.fixes}</span>` : `<span class="muted">—</span>`}</td>
-          <td class="right">${r.issues ? `<span class="pill bad">${r.issues}</span>` : `<span class="muted">—</span>`}</td></tr>`).join("")}
-      </tbody>
-      <tfoot><tr><td>合計</td><td></td><td class="right">${tot.days}</td><td class="right">${fmtDur(tot.work)}</td><td class="right">${toHours(tot.work)}</td><td class="right">${fmtDur(tot.brk)}</td><td></td><td class="right">${tot.issues || "—"}</td></tr></tfoot>
-    </table></div>
-    <p class="small muted" style="margin:12px 0 0">點任一位員工可以看每天的明細、補登或刪除打卡。工時 = 上班到下班扣掉休息。</p>
   </div>`;
 }
 
-function viewDetail(r) {
-  if (!r) return `<div class="card"><div class="empty">找不到這位員工</div></div>`;
-  const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-  return `
-  <div class="card">
-    <div class="top" style="margin-bottom:8px">
-      <div><button class="link small" data-act="back">← 回總覽</button><h2 style="margin:6px 0 0">${esc(r.user.displayName)}・${S.month.replace("-", " 年 ")} 月</h2></div>
-    </div>
-    <div class="stats">
-      <div class="stat"><span class="muted small">總工時</span><b>${fmtDur(r.work)}</b><span class="muted small">${toHours(r.work)} 小時</span></div>
-      <div class="stat"><span class="muted small">出勤天數</span><b>${r.days} 天</b></div>
-      <div class="stat"><span class="muted small">總休息</span><b>${fmtDur(r.brk)}</b></div>
-    </div>
-    ${shiftTable(r.shifts, r.user.uid, () => true)}
-    <div style="margin-top:20px;border-top:1px solid var(--line);padding-top:16px">
-      <h2 style="font-size:15px;margin-bottom:4px">補登打卡</h2>
-      <div class="small muted">員工忘記打卡時，可以在這裡補上正確時間。</div>
-      <form id="addForm" class="addrow">
-        <select name="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select>
-        <input type="datetime-local" name="at" value="${nowLocal}" required>
-        <button class="btn primary" ${S.busy ? "disabled" : ""}>新增</button>
-      </form>
-    </div>
-  </div>`;
-}
-
-/* ---------- 畫面：排班表 ---------- */
-const staffName = uid => S.sched?.staff.find(u => u.uid === uid)?.displayName;
-const schedName = s => staffName(s.uid) || s.name || "（已刪除的帳號）";
-
-function viewSchedule() {
-  const P = S.sched;
-  if (!P) return `<div class="card"><div class="empty">讀取中…</div></div>`;
-  const { first, gridStart, gridEnd } = gridRange(S.month);
-  const { dayFlags } = analyzeSchedule(P.list, P.settings);
-  const today = fmtDate(new Date());
-  const byDate = {}, allByDate = {};
-  for (const s of P.list) { (allByDate[s.date] ??= []).push(s); if (!S.calHide.admin.has(s.uid)) (byDate[s.date] ??= []).push(s); }
-  const roster = P.staff.map(u => u.uid);
-  let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
-  for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
-    const k = fmtDate(d);
-    const shifts = shiftsOnly(byDate[k] || []).sort(byStart);
-    const leaves = leavesOnly(byDate[k] || []).sort((a, b) => schedName(a).localeCompare(schedName(b), "zh-Hant"));
-    const allOff = isAllOff(allByDate[k] || [], roster);
-    const items = allOff ? [] : byMode("admin", [...shifts, ...leaves]);
-    const chips = allOff ? ALL_OFF_CHIP : items.slice(0, MAX_CHIPS).map(s => {
-      const name = schedName(s);
-      if (isLeave(s)) return leaveChip(s, name, "", true);
-      const fl = dayFlags[s.uid + "|" + k];
-      const tip = `${name} ${shiftLabel(s)}${isRemote(s) ? "（居家）" : ""}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
-      return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${homeIcon(s)}${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
-    }).join("");
-    cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}" data-act="sday" data-v="${k}">
-      <div class="dnum">${d.getDate()}${allOff ? "" : dayCount("admin", items)}</div>
-      ${chips}${items.length > MAX_CHIPS ? `<div class="more">還有 ${items.length - MAX_CHIPS} 筆</div>` : ""}
-    </div>`;
+/* ---------- 報表 ---------- */
+function activeMonths(report) {
+  const idx = [];
+  for (let i = 0; i < 12; i++) {
+    if (report.rows.some(r => (r.type === "line" || r.type === "memo") && r.values[i])) idx.push(i);
   }
-  return `
-  <div class="card">
-    <div class="cardhead">
-      <h2>${first.getFullYear()} 年 ${first.getMonth() + 1} 月班表</h2>
-      <div style="display:flex;gap:6px">
-        <button class="btn sm" data-act="smonth" data-v="-1">‹ 上個月</button>
-        <button class="btn sm" data-act="smonth" data-v="0">本月</button>
-        <button class="btn sm" data-act="smonth" data-v="1">下個月 ›</button>
+  if (!idx.length) return [Math.max(0, +S.month.slice(5, 7) - 1)];
+  const out = [];
+  for (let i = idx[0]; i <= idx[idx.length - 1]; i++) out.push(i);
+  return out;
+}
+
+function reportTable(report, drill) {
+  const months = activeMonths(report);
+  const head = months.map(i => drill
+    ? `<th class="mh ${S.drill === i ? "on" : ""}"><button data-act="drill" data-v="${i}">${i + 1}月</button></th>`
+    : `<th>${i + 1}月</th>`).join("");
+  const rows = report.rows.map(r => {
+    if (r.type === "head") return `<tr class="head"><td>${esc(r.label)}</td>${months.map(() => "<td></td>").join("")}<td></td></tr>`;
+    return `<tr class="${r.type}"><td>${esc(r.label)}</td>${months.map(i => `<td class="num">${r.values[i] === null ? "" : signed(r.values[i])}</td>`).join("")}<td class="num">${r.total === null || r.total === undefined ? "" : signed(r.total)}</td></tr>`;
+  }).join("");
+  return `<div class="tablewrap"><table class="report"><thead><tr><th>科目</th>${head}<th>${report.year} 合計</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+const yearControl = type => `<div class="row spread" style="margin-bottom:10px">
+  <div class="ctrl"><select id="f-year" aria-label="年度">${yearsAvailable().map(y => `<option value="${y}"${y === S.year ? " selected" : ""}>${y} 年</option>`).join("")}</select></div>
+  <button class="btn primary" data-act="download" data-v="${type}" id="dl-${type}">下載 Excel</button>
+</div>`;
+
+function yearsAvailable() {
+  const set = new Set([S.year, +todayStr().slice(0, 4)]);
+  liveEntries().forEach(e => {
+    set.add(+e.date.slice(0, 4));
+    if (e.serviceDate) set.add(+e.serviceDate.slice(0, 4));
+  });
+  return [...set].sort();
+}
+
+function viewPnL() {
+  const report = E.buildPnL(S.entries, S.settings, S.year);
+  const months = activeMonths(report);
+  const m = S.drill !== null && months.includes(S.drill) ? S.drill : null;
+  const detail = m === null ? "" : `<div class="card"><h2>${m + 1} 月損益明細</h2><div class="tablewrap"><table>
+    <thead><tr><th>類別</th><th>細項</th><th>客人</th><th>入帳／付款日</th><th class="num">金額</th></tr></thead>
+    <tbody>${report.details[m].slice().sort((a, b) => b.amount - a.amount).map(d => `<tr class="click" data-act="edit" data-id="${esc(d.entry.id)}">
+      <td>${esc(d.line)}</td><td class="wide">${esc(d.entry.desc)}</td><td>${esc(d.entry.customer || "")}</td><td class="num">${esc(d.entry.date)}</td><td class="num">${signed(d.amount)}</td></tr>`).join("")}</tbody>
+  </table></div></div>`;
+  return `<div class="stack"><div class="card">${yearControl("pnl")}
+    <p class="small muted" style="margin:0 0 8px">收入依服務日期算月份；訂金在服務前列預收款。點月份可看明細。</p>
+    ${reportTable(report, true)}</div>${detail}</div>`;
+}
+
+function viewCash() {
+  const report = E.buildCash(S.entries, S.settings, S.year);
+  const months = activeMonths(report);
+  const noOpening = !S.settings.opening?.month;
+  const methods = report.methods.length ? `<div class="card"><h2>各金流方式</h2><div class="tablewrap"><table class="report">
+    <thead><tr><th>金流方式</th>${months.map(i => `<th>${i + 1}月收</th><th>${i + 1}月支</th>`).join("")}</tr></thead>
+    <tbody>${report.methods.map(r => `<tr class="line"><td>${esc(r.label)}</td>${months.map(i => `<td class="num">${signed(r.in[i])}</td><td class="num">${signed(r.out[i])}</td>`).join("")}</tr>`).join("")}</tbody>
+  </table></div></div>` : "";
+  return `<div class="stack"><div class="card">${yearControl("cash")}
+    <p class="small muted" style="margin:0 0 8px">依實際收付日期計算。代墊款要等公司還錢才算流出。${noOpening ? `<button class="link" data-act="tab" data-v="config">填期初現金</button>就能看到月底現金餘額。` : ""}</p>
+    ${reportTable(report, false)}</div>${methods}</div>`;
+}
+
+/* ---------- 設定 ---------- */
+function viewConfig() {
+  const s = S.settings;
+  const types = [["direct", "服務成本（歸服務月）"], ["opex", "營業費用（歸付款月）"], ["none", "不列損益"]];
+  return `<div class="stack">
+    <div class="card">
+      <h2>匯入現有 Excel</h2>
+      <p class="small muted" style="margin:0 0 10px">選你現在的流水帳檔案，系統會從細項讀出服務日期、客人和類型。檔案只在這個瀏覽器讀取，確認後才存進資料庫。已匯入過的同一筆會自動跳過。</p>
+      <input type="file" id="import-file" accept=".xlsx" aria-label="選擇 Excel 檔">
+    </div>
+    <div class="card">
+      <h2>期初現金</h2>
+      <p class="small muted" style="margin:0 0 10px">填開始記帳那個月月初，全部帳戶和現金加起來的金額。</p>
+      <div class="grid2">
+        <div><label for="c-open-m">開始月份</label><input type="month" id="c-open-m" value="${esc(s.opening?.month || "")}"></div>
+        <div><label for="c-open-a">月初金額</label><input type="number" inputmode="numeric" id="c-open-a" value="${esc(s.opening?.amount || "")}"></div>
       </div>
     </div>
-    ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
-    ${viewModeBar("admin")}
-    ${viewPeopleFilter("admin", P.staff.map(u => ({ uid: u.uid, name: u.displayName })))}
-    <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班或休假可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「名字 休」是休假（假別在點進去的那天可以看到）；標「!」的班有工時提醒，點進去可以看原因。</p>
-  </div>
-  ${viewSchedSummary()}
-  ${viewSchedColors()}
-  ${viewSchedSettings()}`;
-}
-
-function viewSchedColors() {
-  const P = S.sched;
-  if (!P.staff.length) return "";
-  const custom = P.settings.colors || {};
-  return `
-  <div class="card" style="margin-top:16px">
-    <h2 style="margin-bottom:4px">人員顏色</h2>
-    <div class="small muted" style="margin-bottom:8px">點色塊就能換顏色，班表、統計和前台都會一起換。</div>
-    <div class="colors">${P.staff.map(u => `
-      <div class="rowl">
-        <input type="color" class="colorpick" data-color="${esc(u.uid)}" value="${pcolor(u.uid)}" aria-label="${esc(u.displayName)} 的顏色" ${S.busy ? "disabled" : ""}>
-        <span class="sc" style="--pc:${pcolor(u.uid)};font-size:13px;flex:1">${esc(u.displayName)}</span>
-        ${isHex(custom[u.uid]) ? `<button class="btn sm" data-act="scolorreset" data-v="${esc(u.uid)}">預設</button>` : ""}
-      </div>`).join("")}
-    </div>
-  </div>`;
-}
-
-function viewSchedSummary() {
-  const P = S.sched;
-  const { first, last } = gridRange(S.month);
-  const mFrom = fmtDate(first), mTo = fmtDate(last);
-  const { dayFlags, cycleFlags } = analyzeSchedule(P.list, P.settings);
-  const stats = {};
-  const ensure = uid => (stats[uid] ??= { days: new Set(), hours: 0, off: new Set(), home: new Set() });
-  P.staff.forEach(u => ensure(u.uid));
-  for (const s of P.list) if (s.date >= mFrom && s.date <= mTo) {
-    const st = ensure(s.uid);
-    if (isLeave(s)) { st.off.add(s.date); continue; }
-    st.days.add(s.date); st.hours += shiftHours(s); if (isRemote(s)) st.home.add(s.date);
-  }
-  const uids = Object.keys(stats);
-  if (!uids.length) return `<div class="card" style="margin-top:16px"><div class="empty">還沒有員工帳號。請員工到前台「申請員工帳號」，申請後就能排班。</div></div>`;
-
-  const warns = [];
-  for (const [key, msgs] of Object.entries(dayFlags).sort()) {
-    const [uid, d] = key.split("|");
-    if (d < mFrom || d > mTo) continue;
-    for (const m of msgs) warns.push({ uid, text: `${schedName({ uid })} ${dayLabel(d)}：${m}` });
-  }
-  for (const c of cycleFlags) if (c.to >= mFrom && c.from <= mTo)
-    warns.push({ uid: c.uid, text: `${schedName({ uid: c.uid })} 週期 ${c.from.slice(5)}～${c.to.slice(5)}：共排 ${fmtH(c.hours)} 小時，超過雙週 80 小時上限` });
-  const wc = {};
-  warns.forEach(w => wc[w.uid] = (wc[w.uid] || 0) + 1);
-
-  const actual = Object.fromEntries((P.rows || []).map(r => [r.user.uid, r.work]));
-  const rows = uids.map(uid => ({ uid, name: schedName({ uid }), days: stats[uid].days.size, home: stats[uid].home.size, off: stats[uid].off.size, hours: stats[uid].hours, actual: actual[uid] }))
-    .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, "zh-Hant"));
-  const tot = rows.reduce((a, r) => ({ days: a.days + r.days, off: a.off + r.off, hours: a.hours + r.hours, actual: a.actual + (r.actual || 0) }), { days: 0, off: 0, hours: 0, actual: 0 });
-  return `
-  <div class="card" style="margin-top:16px">
-    <h2>${first.getMonth() + 1} 月排班時數</h2>
-    <div class="tablewrap"><table>
-      <thead><tr><th>姓名</th><th class="right">排班天數</th><th class="right">休假天數</th><th class="right">排班時數</th><th class="right">實際工時</th><th class="right">提醒</th></tr></thead>
-      <tbody>${rows.map(r => `<tr>
-        <td><span class="sc" style="--pc:${pcolor(r.uid)};display:inline-block;font-size:13px">${esc(r.name)}</span></td>
-        <td class="right">${r.days}${r.home ? `<span class="small muted">（居家 ${r.home}）</span>` : ""}</td><td class="right">${r.off || `<span class="muted">—</span>`}</td><td class="right"><b>${fmtH(r.hours)}</b></td>
-        <td class="right">${r.actual == null ? `<span class="muted">—</span>` : toHours(r.actual)}</td>
-        <td class="right">${wc[r.uid] ? `<span class="pill bad">${wc[r.uid]}</span>` : `<span class="muted">—</span>`}</td></tr>`).join("")}
-      </tbody>
-      <tfoot><tr><td>合計</td><td class="right">${tot.days}</td><td class="right">${tot.off}</td><td class="right">${fmtH(tot.hours)}</td><td class="right">${toHours(tot.actual)}</td><td></td></tr></tfoot>
-    </table></div>
-    ${warns.length ? `<ul class="warns">${warns.map(w => `<li>${esc(w.text)}</li>`).join("")}</ul>` : ""}
-    <p class="small muted" style="margin:12px 0 0">排班時數已扣掉休息時間；實際工時就是「出勤總覽」的總工時（上班到下班扣掉休息）。${P.settings.cycleStart ? "" : "在下方填雙週變形工時的週期起始日後，也會檢查每兩週 80 小時上限。"}</p>
-  </div>`;
-}
-
-function viewSchedSettings() {
-  const st = S.sched.settings;
-  return `
-  <div class="card" style="margin-top:16px">
-    <h2 style="margin-bottom:4px">排班預設值</h2>
-    <div class="small muted">新增班時會先帶入這組時間，每個班都還可以再改。</div>
-    <form id="schedSetForm">
-      <div class="two">
-        <div><label>預設上班時間</label>${timePicker("start", st.start)}</div>
-        <div><label>預設下班時間</label>${timePicker("end", st.end)}</div>
+    <div class="card">
+      <h2>選單內容</h2>
+      <div class="stack">
+        <div><label for="c-brands">品牌（一行一個）</label>${area("c-brands", s.brands)}</div>
+        <div><label for="c-methods">金流方式（一行一個）</label>${area("c-methods", s.methods)}</div>
+        <div><label for="c-adv">代墊款人（一行一個）</label>${area("c-adv", s.advancers)}</div>
+        <div><label for="c-salary">代墊款人對應的薪資名稱（格式：居米=Jimmy，代墊款會從這個名字的薪資扣抵）</label>${area("c-salary", Object.entries(s.salaryNames || {}).map(([k, v]) => `${k}=${v}`))}</div>
       </div>
-      <label>預設休息時間（分鐘）</label>
-      <input type="number" name="breakMin" min="0" step="5" value="${Number(st.breakMin) || 0}">
-      <label>雙週變形工時週期起始日（選填）</label>
-      <input type="date" name="cycleStart" value="${esc(st.cycleStart || "")}">
-      <div class="small muted" style="margin-top:4px">填勞資會議紀錄上寫的實施日，系統會以每兩週為一個週期，提醒排班超過 80 小時的人。</div>
-      <button class="btn block" ${S.busy ? "disabled" : ""}>儲存預設值</button>
+    </div>
+    <div class="card">
+      <h2>費用科目</h2>
+      <div class="tablewrap"><table><thead><tr><th>科目</th><th>損益歸屬</th><th></th></tr></thead><tbody>
+      ${s.categories.map((c, i) => `<tr><td><input id="cat-n-${i}" value="${esc(c.name)}" aria-label="科目名稱"></td>
+        <td><select id="cat-t-${i}" aria-label="損益歸屬">${types.map(([k, l]) => `<option value="${k}"${c.type === k ? " selected" : ""}>${l}</option>`).join("")}</select></td>
+        <td><button class="btn tiny" data-act="catDel" data-v="${i}" aria-label="刪除 ${esc(c.name)}">刪除</button></td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="row spread" style="margin-top:10px"><button class="btn tiny" data-act="catAdd">新增科目</button><button class="btn primary" data-act="saveConfig" id="save-config">儲存設定</button></div>
+    </div>
+    ${store.demo ? `<div class="card"><h2>示範資料</h2><div class="row"><button class="btn" data-act="demoReset" data-v="1">還原範例</button><button class="btn" data-act="demoReset" data-v="0">清空，從零開始試</button></div></div>` : ""}
+  </div>`;
+}
+const area = (id, list) => `<textarea id="${id}" rows="${Math.max(3, list.length)}" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:inherit;font:inherit">${esc(list.join("\n"))}</textarea>`;
+const lines = id => document.getElementById(id).value.split("\n").map(x => x.trim()).filter(Boolean);
+
+function collectCategories() {
+  return S.settings.categories.map((c, i) => ({ name: document.getElementById(`cat-n-${i}`).value.trim(), type: document.getElementById(`cat-t-${i}`).value })).filter(c => c.name);
+}
+
+function collectConfig() {
+  return {
+    ...S.settings,
+    brands: lines("c-brands"), methods: lines("c-methods"), advancers: lines("c-adv"), categories: collectCategories(),
+    salaryNames: Object.fromEntries(lines("c-salary").map(l => l.split("=").map(x => x.trim())).filter(p => p[0] && p[1])),
+    opening: { month: document.getElementById("c-open-m").value, amount: +document.getElementById("c-open-a").value || 0 },
+  };
+}
+
+/* ---------- 登入與主畫面 ---------- */
+function viewLogin() {
+  return `<div class="wrap narrow"><div class="card">
+    <h1>${esc(STUDIO_NAME)}記帳</h1>
+    <p class="muted small">請用開通過權限的帳號登入。</p>
+    <form id="login" class="stack">
+      <div><label for="l-email">信箱</label><input id="l-email" type="email" autocomplete="username" required></div>
+      <div><label for="l-pass">密碼</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+      ${S.loginMsg ? `<div class="err">${esc(S.loginMsg)}</div>` : ""}
+      <button class="btn primary" type="submit">登入</button>
     </form>
-  </div>`;
+  </div></div>`;
 }
 
-function calcLine(f) {
-  if (!f.start || !f.end) return "";
-  if (f.start === f.end) return `<span class="w">上班和下班時間不能一樣</span>`;
-  const h = shiftHours(f);
-  let t = `排班工時 <b>${fmtH(h)}</b> 小時（已扣休息 ${Number(f.breakMin) || 0} 分鐘）`;
-  if (isOvernight(f)) t += "・跨夜班，下班時間算到隔天";
-  if (h > 12) t += `<br><span class="w">超過含加班的 12 小時上限</span>`;
-  else if (h > 10) t += `<br><span class="w">超過變形工時單日正常工時 10 小時，超過部分要算加班</span>`;
-  return t;
+function feeBanner() {
+  const list = liveEntries().filter(E.feePending);
+  if (!list.length || S.onlyFee) return "";
+  const total = list.reduce((s, e) => s + e.amount, 0);
+  return `<div class="feealert" role="alert"><div><b>${list.length} 筆刷卡還沒填手續費</b><div class="small">刷卡金額共 ${money(total)}，最早一筆是 ${esc(list.map(e => e.date).sort()[0])}。入帳後記得回來補。</div></div>
+    <button class="btn tiny" data-act="toggleFee" id="fee-open">去填手續費</button></div>`;
 }
 
-function viewDayModal() {
-  const D = S.day, P = S.sched;
-  const dayList = P.list.filter(s => s.date === D.date);
-  const shifts = shiftsOnly(dayList).sort(byStart);
-  const leaves = leavesOnly(dayList).sort((a, b) => schedName(a).localeCompare(schedName(b), "zh-Hant"));
-  const offUids = new Set(leaves.map(s => s.uid));
-  const shiftUids = new Set(shifts.map(s => s.uid));
-  const { dayFlags } = analyzeSchedule(P.list, P.settings);
-  const d = parseDate(D.date);
-  const editing = !!D.editId;
-  const leaveMode = D.mode === "leave";
-  // 排班時，當天休假的人不能選；設休假時，已經休假的人不能再選
-  const pickBtn = u => {
-    const off = offUids.has(u.uid);
-    const disabled = leaveMode ? off : off && !(editing && D.pick.has(u.uid));
-    const note = off ? "（休）" : leaveMode && shiftUids.has(u.uid) ? "（有班）" : "";
-    return `<button type="button" data-act="spick" data-v="${esc(u.uid)}" class="${D.pick.has(u.uid) ? "on" : ""}" ${disabled ? "disabled" : ""}>${esc(u.displayName)}${note}</button>`;
-  };
-  const picks = P.staff.length ? `<div class="picks">${P.staff.map(pickBtn).join("")}</div>`
-    : `<div class="small muted">還沒有員工帳號，員工到前台申請後就能排班。</div>`;
-  const form = leaveMode ? `
-      <h3>設定休假</h3>
-      <form id="schedForm">
-        <label>人員（可複選）</label>
-        ${picks}
-        <label>假別</label>
-        <select name="leaveType">${LEAVE_TYPES.map(t => `<option ${t === D.leaveType ? "selected" : ""}>${t}</option>`).join("")}</select>
-        <div class="calc">休假的人當天不能排班；如果這天已經有班，設為休假時會一併刪除那個班。</div>
-        ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
-        <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : "設為休假"}</button>
-      </form>` : `
-      <h3>${editing ? "修改排班" : "新增排班"}</h3>
-      <form id="schedForm">
-        <label>${editing ? "人員" : "人員（可複選）"}</label>
-        ${picks}
-        <div class="two">
-          <div><label>上班時間</label>${timePicker("start", D.form.start)}</div>
-          <div><label>下班時間</label>${timePicker("end", D.form.end)}</div>
-        </div>
-        <label>休息時間（分鐘，不算工時）</label>
-        <input type="number" name="breakMin" min="0" step="5" value="${Number(D.form.breakMin) || 0}">
-        <button type="button" class="btn sm" data-act="sdefault" style="margin-top:8px">套用預設時間</button>
-        <label class="check"><input type="checkbox" name="remote" ${D.form.remote ? "checked" : ""}> 居家上班</label>
-        <div class="calc" id="sCalc">${calcLine(D.form)}</div>
-        ${D.msg ? `<div class="msg ${D.msg.kind}">${esc(D.msg.text)}</div>` : ""}
-        <button class="btn primary block" ${S.busy ? "disabled" : ""}>${S.busy ? "儲存中…" : editing ? "儲存修改" : "加入班表"}</button>
-      </form>`;
-  return `
-  <div class="modal-bg" data-close="1">
-    <div class="modal" role="dialog" aria-modal="true">
-      <h2 style="margin:0 0 8px">${d.getMonth() + 1} 月 ${d.getDate()} 日（週${WEEK[d.getDay()]}）</h2>
-      ${shifts.length ? `<ul class="list">${shifts.map(s => {
-        const fl = dayFlags[s.uid + "|" + D.date];
-        const name = schedName(s);
-        return `<li><span class="rowl who">
-            <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-            <span class="who"><b>${esc(name)}</b>${homePill(s)}
-              <span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分・排 ${fmtH(shiftHours(s))} 小時</span>
-              ${fl ? `<span class="small" style="color:var(--bad)">${fl.map(esc).join("<br>")}</span>` : ""}</span></span>
-          <span style="display:flex;gap:6px;flex:none">
-            <button class="btn sm" data-act="sedit" data-v="${esc(s.id)}">修改</button>
-            <button class="btn sm danger" data-act="sdel" data-v="${esc(s.id)}">刪除</button>
-          </span></li>`;
-      }).join("")}</ul>` : `<div class="empty" style="padding:12px">這天還沒有排班</div>`}
-      ${leaves.length ? `<h3 style="margin:14px 0 2px">休假</h3><ul class="list">${leaves.map(s => {
-        const name = schedName(s);
-        return `<li><span class="rowl who">
-            <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-            <span class="who"><b>${esc(name)}</b><span class="small muted">${esc(leaveLabel(s))}</span></span></span>
-          <button class="btn sm danger" data-act="sdel" data-v="${esc(s.id)}">取消休假</button></li>`;
-      }).join("")}</ul>` : ""}
-      <hr>
-      ${editing ? "" : `<div class="seg" style="margin:12px 0 0">
-        <button type="button" data-act="smode" data-v="shift" class="${!leaveMode ? "on" : ""}">排班</button>
-        <button type="button" data-act="smode" data-v="leave" class="${leaveMode ? "on" : ""}">休假</button>
-      </div>`}
-      ${form}
-      <div class="btnrow">
-        ${editing ? `<button class="btn" data-act="scancel">取消修改</button>` : ""}
-        <button class="btn" data-act="sclose">關閉</button>
-      </div>
-    </div>
-  </div>`;
-}
-
-/* 拖曳放開後：問要複製還是移動 */
-function viewDropModal() {
-  const { s, to, note } = S.dropAsk;
-  const name = schedName(s);
-  const leave = isLeave(s), what = leave ? "休假" : "班";
-  return `
-  <div class="modal-bg" data-close="1">
-    <div class="modal" role="dialog" aria-modal="true" style="max-width:420px">
-      <h2 style="margin:0 0 12px">要複製還是移動？</h2>
-      <div class="rowl">
-        <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-        <span class="who"><b>${esc(name)}</b>${homePill(s)}<span class="small muted">${leave ? esc(leaveLabel(s)) : `${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分`}</span></span>
-      </div>
-      <p style="margin:14px 0 4px;font-size:16px">${dayLabel(s.date)}　→　<b>${dayLabel(to)}</b></p>
-      ${note ? `<div class="msg err" style="margin-top:8px">${esc(note)}${leave ? "。" : "，繼續的話這天會有兩個班。"}</div>` : ""}
-      <div class="small muted" style="margin-top:10px;line-height:1.7">
-        <b>複製</b>：${dayLabel(s.date)} 的${what}保留，${dayLabel(to)} 再加一個一樣的${what}<br>
-        <b>移動</b>：${what}改到 ${dayLabel(to)}，${dayLabel(s.date)} 就沒有這個${what}了
-      </div>
-      <div class="btnrow">
-        <button class="btn" data-act="dropdo" data-v="copy" ${S.busy ? "disabled" : ""}>複製</button>
-        <button class="btn primary" data-act="dropdo" data-v="move" ${S.busy ? "disabled" : ""}>移動</button>
-      </div>
-      <button class="btn block" data-act="dropcancel" style="margin-top:8px">取消</button>
-    </div>
-  </div>`;
-}
-
-/* ---------- 資料載入 ---------- */
-async function loadMine() {
-  const end = new Date(Date.now() + 60000);
-  const start = new Date(); start.setDate(start.getDate() - 40); start.setHours(0, 0, 0, 0);
-  S.mine = await S.store.punchesFor(S.me.uid, start, end);
-}
-
-async function loadMyMonth() {
-  const [y, m] = S.myMonth.split("-").map(Number);
-  const start = new Date(y, m - 1, 1), end = new Date(y, m, 1);
-  const margin = STALE_HOURS * 3600e3;
-  try {
-    const ps = await S.store.punchesFor(S.me.uid, new Date(+start - margin), new Date(Math.min(+end + margin, Date.now() + 60000)));
-    S.myShifts = computeShifts(ps).filter(s => s.date.startsWith(S.myMonth));
-  } catch (e) {
-    S.myShifts = [];
-    S.fixMsg = { text: "讀取明細失敗：" + (e.message || e), kind: "err" };
-  }
-}
-
-// 前台用：今天上班的人員、我接下來兩週的班
-async function loadStaffSchedule() {
-  const today = fmtDate(new Date());
-  S.store.getScheduleSettings().then(st => { S.colors = st.colors || {}; render(); }).catch(() => {});   // 只用來顯示人員顏色
-  try {
-    const list = await S.store.schedulesBetween(today, fmtDate(addDays(new Date(), 13)));
-    const todays = list.filter(s => s.date === today);
-    S.crew = shiftsOnly(todays).sort(byStart);
-    S.offToday = leavesOnly(todays);
-    S.myUpcoming = list.filter(s => s.uid === S.me.uid).sort(byStart);
-    S.crewErr = null;
-  } catch (e) {
-    S.crew = []; S.offToday = []; S.myUpcoming = [];
-    S.crewErr = "讀不到班表";
-    console.warn("讀取班表失敗（如果還沒更新 Firestore 規則，這是正常的）：", e);
-  }
-}
-
-// 前台月班表：抓整頁月曆範圍（含前後補滿的那幾天）
-async function loadStaffCal() {
-  const C = S.staffCal, month = C.month;
-  const { gridStart, gridEnd } = gridRange(month);
-  try {
-    const list = await S.store.schedulesBetween(fmtDate(gridStart), fmtDate(gridEnd));
-    if (month !== S.staffCal.month) return;   // 讀取中又切了月份
-    C.list = list; C.err = null;
-  } catch (e) {
-    C.list = []; C.err = "讀不到班表";
-    console.warn("讀取月班表失敗：", e);
-  }
-}
-
-async function reloadStaff() {
-  await Promise.all([loadMine(), loadMyMonth(), loadStaffSchedule(), loadStaffCal()]);
-}
-
-// 某月份每位員工的出勤統計（出勤總覽和排班表共用）
-async function fetchAdminRows(month) {
-  const [y, m] = month.split("-").map(Number);
-  const start = new Date(y, m - 1, 1), end = new Date(y, m, 1);
-  const margin = STALE_HOURS * 3600e3;   // 抓前後一點，跨午夜的班次才不會被切斷
-  const [staff, punches] = await Promise.all([S.store.listStaff(), S.store.punchesAll(new Date(+start - margin), new Date(+end + margin))]);
-  const byUid = {};
-  for (const p of punches) (byUid[p.uid] ??= []).push(p);
-  return staff.map(user => {
-    const shifts = computeShifts(byUid[user.uid] || []).filter(s => s.date.startsWith(month));
-    return {
-      user, shifts,
-      work: shifts.reduce((a, s) => a + liveWork(s), 0),
-      brk: shifts.reduce((a, s) => a + liveBrk(s), 0),
-      days: new Set(shifts.filter(s => s.in).map(s => s.date)).size,
-      issues: shifts.filter(s => s.issue).length,
-      fixes: shifts.flatMap(s => s.punches).filter(p => p.manual && p.by === p.uid).length,
-    };
-  }).sort((a, b) => a.user.displayName.localeCompare(b.user.displayName, "zh-Hant"));
-}
-
-async function loadAdmin() {
-  S.admin = null; render();
-  try {
-    S.admin = { rows: await fetchAdminRows(S.month), month: S.month };
-  } catch (e) {
-    S.admin = { rows: [], month: S.month };
-    S.adminMsg = { text: "讀取失敗：" + (e.message || e), kind: "err" };
-  }
-  render();
-}
-
-const RULES_HINT = "（如果是「沒有權限」，請確認 Firestore 規則已經加上排班的部分，見 README）";
-function schedRange() { const { gridStart, gridEnd } = gridRange(S.month); return [fmtDate(addDays(gridStart, -13)), fmtDate(addDays(gridEnd, 13))]; }
-
-// 排班表：班表（多抓前後 13 天，才能檢查跨月的連續上班和雙週時數）＋ 設定 ＋ 實際工時
-async function loadSchedule() {
-  S.sched = null; render();
-  const month = S.month;
-  const [list, settings, rows] = await Promise.allSettled([
-    S.store.schedulesBetween(...schedRange()), S.store.getScheduleSettings(), fetchAdminRows(month),
-  ]);
-  if (month !== S.month) return;   // 讀取中又切了月份
-  if (rows.status === "fulfilled") S.admin = { rows: rows.value, month };
-  if (settings.status === "fulfilled") S.colors = settings.value.colors || {};
-  S.sched = {
-    list: list.status === "fulfilled" ? list.value : [],
-    settings: { ...SCHED_DEFAULTS, ...(settings.status === "fulfilled" ? settings.value : {}) },
-    settingsOk: settings.status === "fulfilled",   // 讀不到設定時不准存，避免把已存的設定蓋掉
-    rows: rows.status === "fulfilled" ? rows.value : [],
-    staff: rows.status === "fulfilled" ? rows.value.map(r => r.user) : [],
-    err: list.status === "rejected" ? "讀取班表失敗：" + (list.reason?.message || list.reason) + RULES_HINT
-       : rows.status === "rejected" ? "讀取員工資料失敗：" + (rows.reason?.message || rows.reason) : null,
-  };
-  if (rows.status === "rejected") { try { S.sched.staff = await S.store.listStaff(); } catch {} }
-  render();
-}
-
-// 存檔後只重抓班表，不重畫整個讀取中畫面
-async function refreshSchedList() {
-  try { S.sched.list = await S.store.schedulesBetween(...schedRange()); S.sched.err = null; }
-  catch (e) { S.sched.err = "讀取班表失敗：" + (e.message || e) + RULES_HINT; }
-}
-
-// 存某個人的顏色（hex 為 null 代表恢復自動配色）；整份設定一起寫回，不會動到預設時間
-async function saveColor(uid, hex) {
-  if (!S.sched.settingsOk) { S.schedMsg = { text: "讀不到目前的設定，為了避免覆蓋，請按「重新整理」後再改顏色", kind: "err" }; render(); return; }
-  const colors = { ...(S.sched.settings.colors || {}) };
-  if (hex && isHex(hex)) colors[uid] = hex.toLowerCase(); else delete colors[uid];
-  const v = { ...S.sched.settings, colors };
-  S.busy = true; render();
-  try { await S.store.saveScheduleSettings(v); S.sched.settings = v; S.colors = colors; S.schedMsg = null; }
-  catch (err) { S.schedMsg = { text: "顏色儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; window.scrollTo(0, 0); }
-  S.busy = false; render();
-}
-
-function openDay(date, editId = null, mode = "shift") {
-  const st = S.sched.settings;
-  const leaveType = S.day?.leaveType || LEAVE_TYPES[0];
-  S.day = { date, mode, leaveType, editId: null, pick: new Set(), form: { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0, remote: false }, msg: null };
-  if (editId) {
-    const s = S.sched.list.find(x => x.id === editId);
-    if (s) Object.assign(S.day, { editId, pick: new Set([s.uid]), form: { start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote } });
-  }
-}
-
-function exportCSV() {
-  const lines = [];
-  const q = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  lines.push([`${S.month} 月總覽`].map(q).join(","));
-  lines.push(["姓名", "帳號", "出勤天數", "總工時(時:分)", "總工時(小時)", "總休息(小時)", "員工補登筆數", "異常筆數"].map(q).join(","));
-  for (const r of S.admin.rows) lines.push([r.user.displayName, r.user.username, r.days, fmtDur(r.work), toHours(r.work), toHours(r.brk), r.fixes, r.issues].map(q).join(","));
-  lines.push("");
-  lines.push(["每日明細"].map(q).join(","));
-  lines.push(["姓名", "日期", "上班", "下班", "休息時段", "休息(小時)", "工時(時:分)", "工時(小時)", "狀態"].map(q).join(","));
-  for (const r of S.admin.rows) for (const s of r.shifts)
-    lines.push([r.user.displayName, s.date, fmtTime(s.in), fmtTime(s.out), s.breaks.map(b => `${fmtTime(b[0])}-${fmtTime(b[1])}`).join(" "), toHours(liveBrk(s)), fmtDur(liveWork(s)), toHours(liveWork(s)), (s.ongoing ? "進行中" : (s.issue || "正常")) + (s.punches.some(p => p.manual) ? "・含補登" : "")].map(q).join(","));
-  const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = `打卡工時_${S.month}.csv`;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-}
-
-/* ---------- 渲染與事件 ---------- */
 function render() {
-  // 重新畫面時保留表單裡已經填的內容
-  const saved = {};
-  for (const id of ["fixForm", "addForm"]) {
-    const f = document.getElementById(id);
-    if (f) saved[id] = [...f.elements].filter(el => el.name).map(el => [el.name, el.value]);
-  }
-  if (!S.me) app.innerHTML = viewLogin();
-  else if (S.me.role === "admin") app.innerHTML = viewAdmin();
-  else app.innerHTML = viewStaff();
-  for (const [id, vals] of Object.entries(saved)) {
-    const f = document.getElementById(id);
-    if (f) for (const [n, v] of vals) if (f.elements[n]) f.elements[n].value = v;
-  }
-}
-
-async function refreshAdminLeft() {
-  try { S.adminLeft = MAX_ADMINS - await S.store.adminCount(); } catch { S.adminLeft = MAX_ADMINS; }
-}
-
-async function afterLogin() {
-  setMsg(null);
-  S.calHide = { admin: loadHidden("admin"), staff: loadHidden("staff") };
-  S.calView = { admin: loadView("admin"), staff: loadView("staff") };
-  if (S.me.role === "admin") { S.selected = null; S.open.clear(); S.day = null; await (S.adminTab === "schedule" ? loadSchedule() : loadAdmin()); }
-  else {
-    S.open.clear(); S.myMonth = fmtMonth(new Date()); S.myShifts = null; S.fixMsg = null;
-    S.staffCal = { month: fmtMonth(new Date()), list: null, sel: fmtDate(new Date()), err: null };
-    await reloadStaff(); render();
-  }
-}
-
-/* ---------- 排班表：拖曳班次到別天 ----------
-   電腦：按住滑鼠拖；手機：長按 0.35 秒後再拖（不長按就是一般捲動）。
-   放開在另一天就跳出「複製／移動」。拖曳中不重畫畫面，結束後才更新。 */
-const drag = { s: null, active: false, ghost: null, over: null, x0: 0, y0: 0, x: 0, y: 0, timer: null, suppress: false };
-
-function dragStart(chip, x, y) {
-  if (S.me?.role !== "admin" || S.adminTab !== "schedule" || S.busy || S.day || S.dropAsk) return false;
-  const s = S.sched?.list.find(it => it.id === chip.dataset.sid);
-  if (!s) return false;
-  Object.assign(drag, { s, chip, active: false, x0: x, y0: y, x, y });
-  return true;
-}
-function dragBegin() {
-  drag.active = true;
-  const r = drag.chip.getBoundingClientRect();
-  const g = drag.chip.cloneNode(true);
-  g.classList.add("ghost"); g.classList.remove("flag");
-  g.style.width = Math.max(r.width, 90) + "px";
-  document.body.appendChild(g);
-  drag.ghost = g;
-  drag.chip.classList.add("dragging");
-  document.body.classList.add("is-dragging");
-  dragMove(drag.x, drag.y);
-}
-function dragMove(x, y) {
-  drag.x = x; drag.y = y;
-  if (!drag.active) return;
-  drag.ghost.style.transform = `translate(${x + 10}px, ${y + 10}px)`;
-  const day = document.elementFromPoint(x, y)?.closest(".cal .day[data-v]") || null;
-  if (day !== drag.over) { drag.over?.classList.remove("drop-over"); drag.over = day; day?.classList.add("drop-over"); }
-}
-function dragEnd(cancel = false) {
-  clearTimeout(drag.timer);
-  const { s, active, over } = drag;
-  drag.ghost?.remove(); over?.classList.remove("drop-over"); drag.chip?.classList.remove("dragging");
-  document.body.classList.remove("is-dragging");
-  Object.assign(drag, { s: null, chip: null, active: false, ghost: null, over: null, timer: null });
-  if (!active) return;
-  drag.suppress = true; setTimeout(() => { drag.suppress = false; }, 400);   // 放開時不要順便打開那天的視窗
-  const to = over?.dataset.v;
-  if (cancel || !s || !to || to === s.date) return;
-  askDrop(s, to);
-}
-function askDrop(s, to) {
-  const list = S.sched.list;
-  if (isLeave(s)) {
-    // 休假：那天已經休假就擋下；那天有班的話，確認後會一起刪掉那個班
-    if (list.some(x => x.date === to && x.uid === s.uid && isLeave(x))) {
-      S.schedMsg = { text: `${schedName(s)} ${dayLabel(to)} 已經是休假了`, kind: "err" };
-      render(); return;
-    }
-    const clash = shiftsOnly(list).filter(x => x.date === to && x.uid === s.uid);
-    S.schedMsg = null;
-    S.dropAsk = { s, to, clash: clash.map(x => x.id),
-      note: clash.length ? `${schedName(s)} ${dayLabel(to)} 有 ${clash.map(shiftLabel).join("、")} 的班，放休假會一併刪除這個班` : "" };
-    render(); return;
-  }
-  if (list.some(x => x.date === to && x.uid === s.uid && isLeave(x))) {
-    S.schedMsg = { text: `${schedName(s)} ${dayLabel(to)} 休假，不能排班（要排請先取消休假）`, kind: "err" };
-    render(); return;
-  }
-  const same = shiftsOnly(list).filter(x => x.date === to && x.uid === s.uid);
-  S.schedMsg = null;
-  S.dropAsk = { s, to, note: same.length ? `${schedName(s)} ${dayLabel(to)} 已經有 ${same.map(shiftLabel).join("、")} 的班` : "" };
-  render();
-}
-
-// 滑鼠
-app.addEventListener("pointerdown", e => {
-  drag.suppress = false;   // 新的一次點擊開始了，不再擋
-  if (e.pointerType !== "mouse" || e.button !== 0) return;
-  const chip = e.target.closest(".cal [data-sid]");
-  if (chip && dragStart(chip, e.clientX, e.clientY)) e.preventDefault();   // 避免拖的時候選到文字
-});
-window.addEventListener("pointermove", e => {
-  if (!drag.s || e.pointerType !== "mouse") return;
-  if (!drag.active && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 5) { drag.x = e.clientX; drag.y = e.clientY; dragBegin(); }
-  dragMove(e.clientX, e.clientY);
-});
-window.addEventListener("pointerup", e => { if (drag.s && e.pointerType === "mouse") { dragMove(e.clientX, e.clientY); dragEnd(); } });
-window.addEventListener("keydown", e => { if (e.key === "Escape" && drag.active) dragEnd(true); });
-
-// 手機：長按才開始拖
-app.addEventListener("touchstart", e => {
-  drag.suppress = false;
-  if (e.touches.length !== 1) return;
-  const chip = e.target.closest(".cal [data-sid]");
-  const t = e.touches[0];
-  if (!chip || !dragStart(chip, t.clientX, t.clientY)) return;
-  drag.timer = setTimeout(() => { if (drag.s) { dragBegin(); navigator.vibrate?.(15); } }, 350);
-}, { passive: true });
-window.addEventListener("touchmove", e => {
-  if (!drag.s) return;
-  const t = e.touches[0];
-  if (!drag.active) {   // 還沒長按就移動 = 在捲動畫面，取消拖曳
-    if (Math.hypot(t.clientX - drag.x0, t.clientY - drag.y0) > 10) dragEnd(true);
+  if (!S.ready) { app.innerHTML = `<div class="wrap"><div class="empty">載入中</div></div>`; return; }
+  if (!S.me) { app.innerHTML = viewLogin(); return; }
+  const tabs = [["ledger", "流水帳"], ["bookings", "預約"], ["pnl", "損益表"], ["cash", "現金流量表"], ["config", "設定"]];
+  if (S.accessError) {
+    app.innerHTML = `<div class="wrap narrow"><div class="card stack"><div class="err">${esc(S.accessError)}</div><button class="btn" data-act="logout">登出</button></div></div>`;
     return;
   }
-  e.preventDefault();
-  dragMove(t.clientX, t.clientY);
-}, { passive: false });
-window.addEventListener("touchend", e => { if (!drag.s) return; if (drag.active) e.preventDefault(); dragEnd(); });
-window.addEventListener("touchcancel", () => { if (drag.s) dragEnd(true); });
-window.addEventListener("contextmenu", e => { if (drag.s) e.preventDefault(); });   // 長按時不要跳出系統選單
+  if (!S.loaded) { app.innerHTML = `<div class="wrap"><div class="empty">正在讀取帳目</div></div>`; return; }
+  const views = { ledger: viewLedger, bookings: viewBookings, pnl: viewPnL, cash: viewCash, config: viewConfig };
+  const active = document.activeElement?.id;
+  const caret = active && document.activeElement.selectionStart;
+  app.innerHTML = `${store.demo ? `<div class="banner">示範模式：範例都是虛構資料，內容只存在這個瀏覽器。</div>` : ""}
+  <div class="wrap">
+    <div class="top"><h1>${esc(STUDIO_NAME)}記帳</h1>
+      ${store.demo ? "" : `<div class="row small muted"><span>${esc(who())}</span><button class="link" data-act="logout">登出</button></div>`}</div>
+    <div class="seg tabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? "on" : ""}" data-act="tab" data-v="${k}">${l}</button>`).join("")}</div>
+    ${feeBanner()}
+    ${views[S.tab]()}
+  </div>`;
+  if (active) {
+    const el = document.getElementById(active);
+    if (el && !el.closest("dialog")) { el.focus(); if (caret !== null && caret !== undefined && el.setSelectionRange && el.type === "search") el.setSelectionRange(caret, caret); }
+  }
+}
 
-app.addEventListener("click", async e => {
-  // 剛拖完放開時瀏覽器會補一個點擊，擋掉它以免打開那天的視窗；但視窗裡的按鈕照常可以按
-  if (drag.suppress && !e.target.closest(".modal")) { drag.suppress = false; e.preventDefault(); return; }
-  // 點視窗外面的灰色區域就關閉
-  if (e.target.matches?.(".modal-bg[data-close]")) { S.day = null; S.dropAsk = null; render(); return; }
-  const el = e.target.closest("[data-act]");
+/* ---------- 登記表單 ---------- */
+function blankEntry(kind) {
+  const s = S.settings;
+  const today = todayStr();
+  const base = { id: null, kind, date: today, amount: "", method: "", note: "", desc: "", advancedBy: "" };
+  if (kind === "income") return { ...base, brand: s.brands[0], payType: "訂金", customer: "", serviceItem: "個人", serviceDate: "" };
+  if (kind === "expense") return { ...base, brand: "", category: "", customer: "", serviceDate: "", pnlMonth: "" };
+  return base;
+}
+
+const withCurrent = (list, cur) => (cur && !list.includes(cur) ? [...list, cur] : list);
+function field(id, label, html) { return `<div><label for="${id}">${label}</label>${html}</div>`; }
+const textInput = (id, value, attrs = "") => `<input id="${id}" value="${esc(value ?? "")}" ${attrs}>`;
+
+function formBody() {
+  const d = draft, s = S.settings;
+  const custs = [...new Set(liveEntries().map(e => e.customer).filter(Boolean))];
+  const cat = s.categories.map(c => c.name);
+  const seg = d.id ? "" : `<div class="seg">${[["income", "收入"], ["expense", "支出"], ["reimburse", "歸還代墊"]].map(([k, l]) => `<button type="button" class="${d.kind === k ? "on" : ""}" data-act="formKind" data-v="${k}">${l}</button>`).join("")}</div>`;
+  let fields = "";
+  if (d.kind === "income") {
+    fields = `<div class="grid2">
+      ${field("d-date", "入帳日期", textInput("d-date", d.date, 'type="date" data-k="date" required'))}
+      ${field("d-amount", "金額", textInput("d-amount", d.amount, 'type="number" min="1" inputmode="numeric" data-k="amount" required'))}
+      ${field("d-brand", "品牌", `<select id="d-brand" data-k="brand">${opt(s.brands, d.brand)}</select>`)}
+      ${field("d-paytype", "類型", `<select id="d-paytype" data-k="payType">${opt(s.payTypes, d.payType)}</select>`)}
+      ${field("d-customer", "客人", textInput("d-customer", d.customer, 'data-k="customer" list="custs" autocomplete="off"') + `<datalist id="custs">${custs.map(c => `<option value="${esc(c)}">`).join("")}</datalist>`)}
+      ${field("d-item", "服務項目", textInput("d-item", d.serviceItem, 'data-k="serviceItem" list="items" autocomplete="off"') + `<datalist id="items">${["個人", "雙人", "個人兩套", "雙人兩套", "三套", "租棚"].map(c => `<option value="${c}">`).join("")}</datalist>`)}
+      ${d.payType === "儲值金" ? "" : field("d-service", d.payType === "其他" ? "服務日期（可不填）" : "實際服務日期", textInput("d-service", d.serviceDate, 'type="date" data-k="serviceDate"'))}
+      ${field("d-method", "金流方式", `<select id="d-method" data-k="method">${opt(withCurrent(s.methods.filter(m => m !== E.ADVANCE), d.method), d.method, "請選擇")}</select>`)}
+    </div>`;
+  } else if (d.kind === "expense") {
+    const direct = E.categoryType(s, d.category) === "direct";
+    fields = `<div class="grid2">
+      ${field("d-date", "付款日期", textInput("d-date", d.date, 'type="date" data-k="date" required'))}
+      ${field("d-amount", "金額", textInput("d-amount", d.amount, 'type="number" min="1" inputmode="numeric" data-k="amount" required'))}
+      ${field("d-category", "科目", `<select id="d-category" data-k="category">${opt(withCurrent(cat, d.category), d.category, "請選擇")}</select>`)}
+      ${field("d-brand", "品牌（共同費用不用選）", `<select id="d-brand" data-k="brand">${opt(s.brands, d.brand, "共同費用")}</select>`)}
+      ${field("d-method", "金流方式", `<select id="d-method" data-k="method">${opt(withCurrent(s.methods, d.method), d.method, "請選擇")}</select>`)}
+      ${E.isCard(d.method) ? field("d-feestatus", "刷卡手續費", `<select id="d-feestatus" data-k="feeStatus">${[["pending", "還沒入帳，之後提醒我"], ["set", "已入帳，填金額"], ["none", "這筆沒有手續費"]].map(([k, l]) => `<option value="${k}"${(d.feeStatus || "pending") === k ? " selected" : ""}>${l}</option>`).join("")}</select>`) : ""}
+      ${E.isCard(d.method) && d.feeStatus === "set" ? field("d-fee", "手續費金額", textInput("d-fee", d.fee, 'type="number" min="1" inputmode="numeric" data-k="fee"')) : ""}
+      ${E.isCard(d.method) && d.feeStatus === "set" ? field("d-feedate", "手續費入帳日（可不填，預設同付款日）", textInput("d-feedate", d.feeDate, 'type="date" data-k="feeDate"')) : ""}
+      ${d.method === E.ADVANCE ? field("d-adv", "代墊款人", `<select id="d-adv" data-k="advancedBy">${opt(withCurrent(s.advancers, d.advancedBy), d.advancedBy, "請選擇")}</select>`) : ""}
+    </div>
+    ${field("d-desc", "細項", textInput("d-desc", d.desc, 'data-k="desc"'))}
+    <div class="grid2">
+      ${field("d-service", direct ? "服務日期（服務成本必填）" : "服務日期（綁定預約才填）", textInput("d-service", d.serviceDate, 'type="date" data-k="serviceDate"'))}
+      ${field("d-customer", "客人（綁定預約才填）", textInput("d-customer", d.customer, 'data-k="customer" list="custs" autocomplete="off"') + `<datalist id="custs">${custs.map(c => `<option value="${esc(c)}">`).join("")}</datalist>`)}
+      ${d.serviceDate ? "" : field("d-pnl", "損益月份（要歸別的月份才改）", textInput("d-pnl", d.pnlMonth, 'type="month" data-k="pnlMonth"'))}
+      ${d.category === "薪資" ? field("d-adv-part", "其中的代墊款（留空會自動計算）", textInput("d-adv-part", d.advanceManual, 'type="number" min="0" inputmode="numeric" data-k="advanceManual"')) : ""}
+    </div>`;
+  } else if (d.kind === "reimburse") {
+    const owed = E.advanceOwed(S.entries, null, S.settings);
+    fields = `<div class="grid2">
+      ${field("d-date", "還款日期", textInput("d-date", d.date, 'type="date" data-k="date" required'))}
+      ${field("d-adv", "代墊款人", `<select id="d-adv" data-k="advancedBy">${opt(Object.keys(owed).filter(k => owed[k]).concat(d.advancedBy && !owed[d.advancedBy] ? [d.advancedBy] : []), d.advancedBy, "請選擇")}</select>`)}
+      ${field("d-amount", "金額", textInput("d-amount", d.amount, 'type="number" min="1" inputmode="numeric" data-k="amount" required'))}
+      ${field("d-method", "金流方式", `<select id="d-method" data-k="method">${opt(withCurrent(s.methods.filter(m => m !== E.ADVANCE), d.method), d.method, "請選擇")}</select>`)}
+    </div>`;
+  } else {
+    fields = `<div class="hint">這筆退款由取消預約產生，要修改請到預約頁復原取消。</div>
+      ${field("d-note", "備註", textInput("d-note", d.note, 'data-k="note"'))}`;
+  }
+  const extra = d.kind === "refund" ? "" : `
+    ${d.kind === "income" && d.id ? field("d-desc", "細項", textInput("d-desc", d.desc, 'data-k="desc"')) : ""}
+    ${field("d-note", "備註", textInput("d-note", d.note, 'data-k="note"'))}`;
+  const flags = d.flags?.length ? `<div class="hint">匯入時標記：${esc(d.flags.join("；"))}。按儲存就算確認完成。</div>` : "";
+  return `${seg}${flags}${fields}${extra}<div id="d-hint"></div><div id="d-err"></div>`;
+}
+
+function refreshHint() {
+  const el = document.getElementById("d-hint");
   if (!el) return;
-  const act = el.dataset.act, v = el.dataset.v;
-
-  /* ----- 排班 ----- */
-  if (act === "cv") { S.calView[el.dataset.w] = v; saveView(el.dataset.w); render(); return; }   // 全部／上班／休假
-  if (act === "pf") {   // 月曆人員開關
-    const w = el.dataset.w, hid = S.calHide[w];
-    if (v === "__all") hid.clear();
-    else if (v === "__me") { hid.clear(); for (const s of S.staffCal.list || []) if (s.uid !== S.me.uid) hid.add(s.uid); }
-    else hid.has(v) ? hid.delete(v) : hid.add(v);
-    saveHidden(w); render(); return;
+  let text = E.explain({ ...draft, amount: +draft.amount || 0 });
+  if (draft.kind === "expense" && draft.category === "薪資" && draft.date && +draft.amount > 0) {
+    const row = { ...draft, id: draft.id || "__draft", amount: +draft.amount, advanceManual: draft.advanceManual === "" || draft.advanceManual === undefined ? undefined : +draft.advanceManual };
+    const part = E.settle([...S.entries.filter(e => e.id !== row.id), row], S.settings).find(e => e.id === row.id).advanceRepaid || 0;
+    if (part) text = `${text}其中 ${money(part)} 是歸還代墊款，薪資費用算 ${money(row.amount - part)}。`;
   }
-  if (act === "dropcancel") { S.dropAsk = null; render(); return; }
-  if (act === "dropdo") {
-    if (!S.dropAsk || S.busy) return;
-    const { s, to } = S.dropAsk;
-    S.busy = true; render();
-    try {
-      const name = staffName(s.uid) || s.name || "";
-      if (isLeave(s)) {
-        // 休假：新增一筆到目標日，並一次刪掉目標日的班（移動的話連原本的休假也刪）
-        const clash = S.dropAsk.clash || [];
-        await S.store.addSchedules([{ uid: s.uid, name, date: to, kind: "leave", leaveType: leaveLabel(s) }], v === "move" ? [s.id, ...clash] : clash);
+  el.innerHTML = text ? `<div class="hint">${esc(text)}</div>` : "";
+}
+
+function openForm(entry, focusFee) {
+  draft = entry ? clone(entry) : blankEntry("income");
+  modal = { type: "form" };
+  if (focusFee && draft.kind === "expense" && E.isCard(draft.method) && draft.feeStatus !== "set") draft.feeStatus = "set";
+  paintForm();
+  dlg.showModal();
+  if (focusFee) document.getElementById("d-fee")?.focus();
+}
+
+function paintForm() {
+  const d = draft;
+  const title = d.id ? `修改${KIND_LABEL[d.kind]}` : "新增一筆";
+  dlg.innerHTML = `<form id="entry-form" method="dialog" novalidate>
+    <div class="mhead"><h2>${title}</h2><button type="button" class="btn tiny" data-act="close">關閉</button></div>
+    <div class="mbody">${formBody()}</div>
+    <div class="mfoot">
+      <div>${d.id ? `<button type="button" class="btn danger" data-act="del" id="del-entry">刪除</button>` : ""}</div>
+      <button type="submit" class="btn primary" id="save-entry">${d.id ? "儲存修改" : "登記"}</button>
+    </div></form>`;
+  refreshHint();
+}
+
+function validate(d) {
+  if (!d.date) return "請填日期。";
+  if (!(+d.amount > 0)) return "請填大於 0 的金額。";
+  if (d.kind === "income") {
+    if (d.payType !== "其他" && !d.customer.trim()) return "請填客人。";
+    if (!["儲值金", "其他"].includes(d.payType) && !d.serviceDate) return "請填實際服務日期，損益才知道歸哪個月。";
+    if (!d.method) return "請選金流方式。";
+  }
+  if (d.kind === "expense") {
+    if (!d.category) return "請選科目。";
+    if (!d.method) return "請選金流方式。";
+    if (d.method === E.ADVANCE && !d.advancedBy) return "請選代墊款人。";
+    if (!d.desc?.trim()) return "請填細項。";
+    if (E.isCard(d.method) && d.feeStatus === "set" && !(+d.fee > 0)) return "請填手續費金額，或改選「還沒入帳」。";
+    if (d.category === "薪資" && d.advanceManual !== "" && +d.advanceManual > +d.amount) return "代墊款不能大於這筆金額。";
+    if (E.categoryType(S.settings, d.category) === "direct" && !d.serviceDate && !d.pnlMonth) return "服務成本請填服務日期，或指定損益月份。";
+  }
+  if (d.kind === "reimburse") {
+    if (!d.advancedBy) return "請選代墊款人。";
+    if (!d.method) return "請選金流方式。";
+  }
+  return "";
+}
+
+async function submitForm() {
+  const d = { ...draft, amount: +draft.amount };
+  const problem = validate(d);
+  if (problem) { document.getElementById("d-err").innerHTML = `<div class="err">${esc(problem)}</div>`; return; }
+  const prior = d.id ? S.entries.find(e => e.id === d.id) : null;
+  if (d.method !== E.ADVANCE && d.kind === "expense") d.advancedBy = "";
+  if (d.kind === "income") {
+    if (d.payType === "儲值金") d.serviceDate = "";
+    const changed = !prior || prior.serviceDate !== d.serviceDate || prior.customer !== d.customer || prior.payType !== d.payType || prior.serviceItem !== d.serviceItem;
+    if (changed && d.serviceDate) d.desc = E.makeDesc(d);
+    if (changed && !d.serviceDate && !d.desc) d.desc = `${d.customer}${d.payType}`;
+  }
+  if (d.kind === "expense" && d.serviceDate) d.pnlMonth = "";
+  if (d.kind === "expense") {
+    if (!E.isCard(d.method)) { delete d.feeStatus; delete d.fee; delete d.feeDate; }
+    else {
+      d.feeStatus = d.feeStatus || "pending";
+      if (d.feeStatus === "set") d.fee = +d.fee; else { delete d.fee; delete d.feeDate; }
+    }
+  }
+  if (d.advanceManual === "" || d.advanceManual === undefined || d.category !== "薪資") delete d.advanceManual;
+  else d.advanceManual = +d.advanceManual;
+  if (d.kind === "reimburse") d.desc = `歸還${d.advancedBy}代墊款`;
+  if (prior && d.serviceDate !== prior.serviceDate && prior.serviceDate) {
+    d.history = [...(d.history || []), { at: new Date().toISOString(), by: who(), action: "改期", from: prior.serviceDate, to: d.serviceDate }];
+  }
+  delete d.flags;
+  const isNew = !d.id;
+  if (isNew) d.id = newId();
+  d.createdBy = d.createdBy || who();
+  const feeMsg = d.kind === "expense" && E.isCard(d.method) && d.feeStatus === "pending" ? "，手續費入帳後記得回來補" : "";
+  if (await save([d], (isNew ? "已登記" : "已儲存") + feeMsg)) {
+    S.month = d.date.slice(0, 7);
+    dlg.close();
+  }
+}
+
+/* ---------- 改期與取消 ---------- */
+function sameDayEntries(b) {
+  return liveEntries().filter(e => e.serviceDate === b.serviceDate && !e.cancel && e.kind !== "refund");
+}
+
+const pickList = b => sameDayEntries(b).map(e => `<label class="check"><input type="checkbox" class="pick" value="${esc(e.id)}"${(e.customer || "") === b.customer ? " checked" : ""}> <span>${esc(e.desc)}｜${e.kind === "income" ? "收" : "付"} ${money(e.amount)}</span></label>`).join("");
+
+function openMove(key) {
+  const b = E.bookings(S.entries).find(x => x.key === key);
+  modal = { type: "move", booking: b };
+  dlg.innerHTML = `<form id="move-form" method="dialog" novalidate>
+    <div class="mhead"><h2>${esc(b.customer)} 改期</h2><button type="button" class="btn tiny" data-act="close">關閉</button></div>
+    <div class="mbody">
+      ${field("m-date", `新的服務日期（原本 ${esc(b.serviceDate)}）`, `<input type="date" id="m-date" required>`)}
+      <div><div class="small muted" style="margin-bottom:4px">一起搬到新日期的項目</div>${pickList(b)}</div>
+      <div id="d-err"></div>
+    </div>
+    <div class="mfoot"><span></span><button class="btn primary" type="submit" id="save-move">確認改期</button></div></form>`;
+  dlg.showModal();
+}
+
+function openCancel(key) {
+  const b = E.bookings(S.entries).find(x => x.key === key);
+  modal = { type: "cancel", booking: b };
+  dlg.innerHTML = `<form id="cancel-form" method="dialog" novalidate>
+    <div class="mhead"><h2>${esc(b.customer)} 取消預約</h2><button type="button" class="btn tiny" data-act="close">關閉</button></div>
+    <div class="mbody">
+      <div><div class="small muted" style="margin-bottom:4px">取消的項目</div>${pickList(b)}</div>
+      <div class="grid2">
+        ${field("x-date", "取消日期", `<input type="date" id="x-date" value="${todayStr()}">`)}
+        ${field("x-refund", `退給客人的金額（已收 ${money(b.received)}）`, `<input type="number" min="0" inputmode="numeric" id="x-refund" value="0">`)}
+        ${field("x-method", "退款方式", `<select id="x-method">${opt(S.settings.methods.filter(m => m !== E.ADVANCE), "", "不退款免選")}</select>`)}
+      </div>
+      <div class="hint" id="x-hint"></div>
+      <div id="d-err"></div>
+    </div>
+    <div class="mfoot"><span></span><button class="btn primary" type="submit" id="save-cancel">確認取消</button></div></form>`;
+  refreshCancelHint();
+  dlg.showModal();
+}
+
+function picked() {
+  const ids = [...dlg.querySelectorAll(".pick:checked")].map(x => x.value);
+  return liveEntries().filter(e => ids.includes(e.id));
+}
+
+function refreshCancelHint() {
+  const el = document.getElementById("x-hint");
+  if (!el) return;
+  const received = picked().filter(e => e.kind === "income").reduce((s, e) => s + e.amount, 0);
+  const refund = +document.getElementById("x-refund").value || 0;
+  const date = document.getElementById("x-date").value;
+  const kept = received - refund;
+  const when = date ? `${+date.slice(5, 7)} 月` : "取消當月";
+  el.textContent = refund >= received ? `全額退款，這筆不算收入，${when}現金流出 ${money(refund)}。`
+    : refund > 0 ? `退 ${money(refund)}，留下的 ${money(kept)} 算 ${when}的取消訂金收入。`
+      : `訂金不退，${money(kept)} 算 ${when}的取消訂金收入。`;
+}
+
+function openStored(id) {
+  const e = S.entries.find(x => x.id === id);
+  modal = { type: "stored", entry: e };
+  const left = e.amount - (e.lines || []).reduce((s, l) => s + l.amount, 0);
+  dlg.innerHTML = `<form id="stored-form" method="dialog" novalidate>
+    <div class="mhead"><h2>${esc(e.customer)} 儲值使用</h2><button type="button" class="btn tiny" data-act="close">關閉</button></div>
+    <div class="mbody"><div class="hint">目前餘額 ${money(left)}。使用的金額會算進服務日期那個月的收入。</div>
+      <div class="grid2">
+        ${field("u-date", "服務日期", `<input type="date" id="u-date" value="${todayStr()}">`)}
+        ${field("u-amount", "使用金額", `<input type="number" min="1" inputmode="numeric" id="u-amount">`)}
+      </div>
+      ${field("u-item", "服務內容", `<input id="u-item">`)}
+      ${(e.lines || []).length ? `<div>${e.lines.map((l, i) => `<div class="check spread"><span>${esc(l.date)}｜${money(l.amount)} ${esc(l.item || "")}</span><button type="button" class="btn tiny" data-act="lineDel" data-v="${i}">刪除</button></div>`).join("")}</div>` : ""}
+      <div id="d-err"></div></div>
+    <div class="mfoot"><span></span><button class="btn primary" type="submit" id="save-stored">記下使用</button></div></form>`;
+  dlg.showModal();
+}
+
+/* ---------- 匯入 ---------- */
+function cellValue(c) {
+  const v = c.value;
+  if (v && typeof v === "object" && !(v instanceof Date)) {
+    if ("result" in v) return v.result;
+    if (v.richText) return v.richText.map(t => t.text).join("");
+    if ("text" in v) return v.text;
+    return "";
+  }
+  return v;
+}
+
+async function readWorkbook(file) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await file.arrayBuffer());
+  const rows = [];
+  wb.worksheets.forEach(ws => {
+    let map = null;
+    ws.eachRow(r => {
+      const values = {};
+      r.eachCell((c, n) => { values[n] = cellValue(c); });
+      if (!map) {
+        const head = Object.entries(values).reduce((o, [n, v]) => { o[String(v).trim()] = +n; return o; }, {});
+        if (head["日期"] && head["項目"] && head["細項"] && head["收入"] && head["支出"]) map = head;
+        return;
       }
-      else if (v === "move") await S.store.updateSchedule(s.id, { date: to });
-      else await S.store.addSchedules([{ uid: s.uid, name, date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote }]);
-      await refreshSchedList();
-      const label = isLeave(s) ? leaveLabel(s) : shiftLabel(s);
-      const removed = isLeave(s) && S.dropAsk.clash?.length ? `（已刪除那天 ${S.dropAsk.clash.length} 個班）` : "";
-      S.schedMsg = { text: `已${v === "move" ? "移動" : "複製"}：${schedName(s)} ${label}，${dayLabel(s.date)} → ${dayLabel(to)}${removed}`, kind: "ok" };
-    } catch (err) { S.schedMsg = { text: `${v === "move" ? "移動" : "複製"}失敗：` + (err.message || err) + RULES_HINT, kind: "err" }; }
-    S.dropAsk = null; S.busy = false; render(); return;
-  }
-  if (act === "atab") {
-    S.adminTab = v; S.schedMsg = null; S.adminMsg = null; S.day = null; S.dropAsk = null;
-    if (v === "schedule") { S.selected = null; await loadSchedule(); }
-    else if (!S.admin || S.admin.month !== S.month) await loadAdmin();
-    else render();
-    return;
-  }
-  if (act === "smonth") {
-    const [y, m] = S.month.split("-").map(Number);
-    S.month = v === "0" ? fmtMonth(new Date()) : fmtMonth(new Date(y, m - 1 + Number(v), 1));
-    S.schedMsg = null; await loadSchedule(); return;
-  }
-  if (act === "sday") { openDay(v); render(); return; }
-  if (act === "sedit") { openDay(S.day.date, v); render(); return; }
-  if (act === "scancel") { openDay(S.day.date); render(); return; }
-  if (act === "smode") { openDay(S.day.date, null, v); render(); return; }
-  if (act === "sclose") { S.day = null; render(); return; }
-  if (act === "spick") {
-    if (S.day.editId) S.day.pick = new Set([v]);
-    else S.day.pick.has(v) ? S.day.pick.delete(v) : S.day.pick.add(v);
-    render(); return;
-  }
-  if (act === "scolorreset") { await saveColor(v, null); return; }
+      const d = values[map["日期"]];
+      if (!(d instanceof Date)) return;
+      const income = +values[map["收入"]] || 0, expense = +values[map["支出"]] || 0;
+      if (!income && !expense) return;
+      rows.push({
+        date: d.toISOString().slice(0, 10), item: values[map["項目"]], desc: values[map["細項"]], income, expense,
+        method: values[map["金流方式"]] || "", advancedBy: values[map["代墊款人"]] || "", note: values[map["備註"]] || "",
+      });
+    });
+  });
+  return rows;
+}
 
-  /* ----- 前台月班表 ----- */
-  if (act === "cday") { S.staffCal.sel = v; render(); return; }
-  if (act === "cmonth") {
-    const C = S.staffCal;
-    const [y, m] = C.month.split("-").map(Number);
-    C.month = v === "0" ? fmtMonth(new Date()) : fmtMonth(new Date(y, m - 1 + Number(v), 1));
-    // 切到本月就選今天，其他月份選 1 號
-    C.sel = C.month === fmtMonth(new Date()) ? fmtDate(new Date()) : C.month + "-01";
-    C.list = null; render();
-    await loadStaffCal(); render(); return;
-  }
-  if (act === "sdefault") {
-    const st = S.sched.settings;
-    S.day.form = { start: st.start, end: st.end, breakMin: Number(st.breakMin) || 0, remote: !!S.day.form.remote }; render(); return;
-  }
-  if (act === "sdel") {
-    const s = S.sched.list.find(x => x.id === v);
-    if (!s) return;
-    const what = isLeave(s) ? `的${leaveLabel(s)}` : ` ${shiftLabel(s)} 這個班`;
-    if (!confirm(isLeave(s) ? `確定要取消 ${schedName(s)} ${dayLabel(s.date)}${what}嗎？` : `確定要刪除 ${schedName(s)} ${dayLabel(s.date)}${what}嗎？`)) return;
-    S.busy = true; render();
-    try {
-      await S.store.deleteSchedule(v);
-      await refreshSchedList();
-      if (S.day.editId === v) openDay(S.day.date, null, S.day.mode);
-      S.day.msg = { text: isLeave(s) ? `已取消 ${schedName(s)} 的${leaveLabel(s)}` : `已刪除 ${schedName(s)} 的班`, kind: "ok" };
-    } catch (err) { S.day.msg = { text: "刪除失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
-    S.busy = false; render(); return;
-  }
+async function startImport(file) {
+  if (!window.ExcelJS) { toast("Excel 工具還沒載入，請確認網路後重新整理"); return; }
+  let rows;
+  try { rows = await readWorkbook(file); }
+  catch { toast("這個檔案讀不出來，請確認是 .xlsx"); return; }
+  if (!rows.length) { toast("找不到含有日期、項目、細項、收入、支出欄位的工作表"); return; }
+  const existing = new Set(liveEntries().map(E.fingerprint));
+  const parsed = E.markSuspects(rows.map(r => E.parseRow(r, S.settings)));
+  const fresh = parsed.filter(p => !existing.has(E.fingerprint(p.entry)));
+  S.importState = { fresh, skipped: parsed.length - fresh.length, income: fresh.filter(p => p.entry.kind === "income").reduce((s, p) => s + p.entry.amount, 0), expense: fresh.filter(p => p.entry.kind === "expense").reduce((s, p) => s + p.entry.amount, 0) };
+  modal = { type: "import" };
+  const flagged = fresh.filter(p => p.flags.length);
+  dlg.innerHTML = `<form id="import-form" method="dialog" novalidate>
+    <div class="mhead"><h2>確認匯入</h2><button type="button" class="btn tiny" data-act="close">關閉</button></div>
+    <div class="mbody">
+      <div class="okmsg">讀到 ${parsed.length} 筆，新增 ${fresh.length} 筆${S.importState.skipped ? `，${S.importState.skipped} 筆已經匯入過` : ""}。收入 ${money(S.importState.income)}，支出 ${money(S.importState.expense)}。</div>
+      ${flagged.length ? `<div class="small muted">這 ${flagged.length} 筆先照下列方式處理，匯入後可在流水帳的「待確認」逐筆修改：</div>
+      <div class="tablewrap"><table><thead><tr><th>日期</th><th>細項</th><th class="num">金額</th><th>處理方式</th></tr></thead><tbody>
+      ${flagged.map(p => `<tr><td class="num">${mmdd(p.entry.date)}</td><td class="wide">${esc(p.entry.desc)}</td><td class="num">${money(p.entry.amount)}</td><td class="small">${esc(p.flags.join("；"))}</td></tr>`).join("")}
+      </tbody></table></div>` : ""}
+    </div>
+    <div class="mfoot"><span></span><button class="btn primary" type="submit" id="do-import"${fresh.length ? "" : " disabled"}>匯入 ${fresh.length} 筆</button></div></form>`;
+  dlg.showModal();
+}
 
-  if (act === "role") { S.role = v; setMsg(null); if (v === "admin") await refreshAdminLeft(); render(); }
-  else if (act === "mode") { S.mode = v; setMsg(null); if (S.role === "admin") await refreshAdminLeft(); render(); }
-  else if (act === "logout") { await S.store.signOut(); S.me = null; S.mine = []; S.admin = null; S.adminMsg = null; S.sched = null; S.day = null; S.schedMsg = null; S.crew = null; S.myUpcoming = []; S.colors = {}; S.dropAsk = null; S.mode = "signin"; setMsg(null); render(); }
-  else if (act === "punch") {
-    if (S.busy) return;
-    S.busy = true; setMsg(null); render();
-    try { await S.store.addPunch(v); await reloadStaff(); setMsg(`${TYPES[v]}打卡成功 ${fmtTime(new Date())}`, "ok"); }
-    catch (err) { setMsg("打卡失敗：" + (err.message || err)); }
-    S.busy = false; render();
+/* ---------- 事件 ---------- */
+document.addEventListener("click", async ev => {
+  const t = ev.target.closest("[data-act]");
+  if (!t) return;
+  const { act, v, id, key } = t.dataset;
+  if (act === "tab") { S.tab = v; S.drill = null; render(); }
+  else if (act === "add") openForm(null);
+  else if (act === "edit") { const e = S.entries.find(x => x.id === id.replace(/#fee$/, "")); if (e) openForm(e, id.endsWith("#fee") || E.feePending(e)); }
+  else if (act === "toggleFee") { S.onlyFee = !S.onlyFee; S.onlyFlagged = false; S.tab = "ledger"; S.query = ""; render(); }
+  else if (act === "reparse") {
+    const docs = liveEntries().map(E.reparseEntry).filter(Boolean);
+    await save(docs, `已判讀 ${docs.length} 筆`);
   }
-  else if (act === "pick") { S.selected = v; S.open.clear(); S.adminMsg = null; render(); window.scrollTo(0, 0); }
-  else if (act === "back") { S.selected = null; S.adminMsg = null; render(); }
-  else if (act === "toggle") { S.open.has(v) ? S.open.delete(v) : S.open.add(v); render(); }
-  else if (act === "reload") { S.adminMsg = null; S.schedMsg = null; await (S.adminTab === "schedule" ? loadSchedule() : loadAdmin()); }
-  else if (act === "csv") exportCSV();
+  else if (act === "toggleFlag") { S.onlyFlagged = !S.onlyFlagged; S.picked.clear(); render(); }
+  else if (act === "confirmFlags") {
+    const now = new Date().toISOString();
+    const docs = liveEntries().filter(e => S.picked.has(e.id) && E.canConfirm(e)).map(e => E.confirmEntry(e, who(), now));
+    if (docs.length && await save(docs, `已確認 ${docs.length} 筆`)) { S.picked.clear(); render(); }
+  }
+  else if (act === "bookTab") { S.bookTab = v; render(); }
+  else if (act === "move") openMove(key);
+  else if (act === "cancel") openCancel(key);
+  else if (act === "useStored") openStored(id);
+  else if (act === "close") dlg.close();
+  else if (act === "drill") { S.drill = S.drill === +v ? null : +v; render(); }
+  else if (act === "download") download(v);
+  else if (act === "logout") store.signOut();
+  else if (act === "formKind") { draft = blankEntry(v); paintForm(); }
+  else if (act === "undoCancel") {
+    const b = E.bookings(S.entries).find(x => x.key === key);
+    if (await save(E.undoCancel(S.entries, b, who(), new Date().toISOString()), "已復原取消")) render();
+  }
   else if (act === "del") {
-    e.stopPropagation();
-    if (!confirm("確定要刪除這筆打卡嗎？")) return;
-    if (S.me.role !== "admin") {
-      try { await S.store.deletePunch(v); S.fixMsg = { text: "已刪除這筆補登", kind: "ok" }; }
-      catch (err) { S.fixMsg = { text: "刪除失敗：" + (err.message || err), kind: "err" }; }
-      await reloadStaff(); render(); return;
-    }
-    try { await S.store.deletePunch(v); S.adminMsg = { text: "已刪除", kind: "ok" }; }
-    catch (err) { S.adminMsg = { text: "刪除失敗：" + (err.message || err), kind: "err" }; }
-    await loadAdmin();
+    if (t.dataset.armed) {
+      if (await save([{ ...S.entries.find(e => e.id === draft.id), deleted: true, deletedBy: who() }], "已刪除")) dlg.close();
+    } else { t.dataset.armed = "1"; t.textContent = "再按一次確定刪除"; }
   }
+  else if (act === "lineDel") {
+    const e = clone(modal.entry);
+    e.lines.splice(+v, 1);
+    if (await save([e], "已刪除這次使用")) dlg.close();
+  }
+  else if (act === "catAdd") { S.settings = { ...S.settings, ...collectConfig() }; S.settings.categories.push({ name: "新科目", type: "opex" }); render(); }
+  else if (act === "catDel") { const c = collectConfig(); c.categories.splice(+v, 1); S.settings = c; render(); }
+  else if (act === "saveConfig") { try { await store.saveSettings(collectConfig()); toast("設定已儲存"); } catch (e) { toast(e.message); } }
+  else if (act === "demoReset") { await store.reset(v === "1"); toast("示範資料已更新"); }
 });
 
-app.addEventListener("change", async e => {
-  if (e.target.dataset?.color) { await saveColor(e.target.dataset.color, e.target.value); return; }
-  if (e.target.id === "monthPick" && e.target.value) {
-    S.month = e.target.value; S.open.clear(); S.adminMsg = null; S.schedMsg = null;
-    S.adminTab === "schedule" ? loadSchedule() : loadAdmin();
-  }
-  if (e.target.id === "myMonthPick" && e.target.value) { S.myMonth = e.target.value; S.open.clear(); S.myShifts = null; render(); await loadMyMonth(); render(); }
-});
-
-// 排班視窗：改時間時即時更新工時試算（不重畫整個畫面，才不會打斷輸入）
-app.addEventListener("input", e => {
-  const form = e.target.form;
-  // 拖動色盤時先即時預覽旁邊的名字，放開（change）才存檔
-  if (e.target.dataset?.color) { const chip = e.target.nextElementSibling; if (chip) chip.style.setProperty("--pc", e.target.value); return; }
-  if (e.target.dataset?.tp) {   // 時／分下拉：組成 HH:MM 放進隱藏欄位
-    const wrap = e.target.closest(".tp");
-    const [hs, ms] = wrap.querySelectorAll("select");
-    const hidden = wrap.querySelector("input[type=hidden]");
-    hidden.value = `${hs.value}:${ms.value}`;
-    if (form?.id === "schedForm" && S.day) { S.day.form[hidden.name] = hidden.value; const c = document.getElementById("sCalc"); if (c) c.innerHTML = calcLine(S.day.form); }
+/* 注音等輸入法選字時不能重畫畫面，否則選字會被中斷，選完字才更新 */
+let composing = false;
+document.addEventListener("compositionstart", () => { composing = true; });
+document.addEventListener("compositionend", ev => { composing = false; handleInput(ev.target); });
+document.addEventListener("input", ev => {
+  if (composing || ev.isComposing) {
+    if (ev.target.dataset?.k && draft) draft[ev.target.dataset.k] = ev.target.value;
     return;
   }
-  if (form?.id !== "schedForm" || !S.day || !e.target.name) return;
-  if (e.target.name === "leaveType") { S.day.leaveType = e.target.value; return; }
-  if (e.target.type === "checkbox") { S.day.form[e.target.name] = e.target.checked; return; }
-  S.day.form[e.target.name] = e.target.name === "breakMin" ? Math.max(0, Number(e.target.value) || 0) : e.target.value;
-  const c = document.getElementById("sCalc");
-  if (c) c.innerHTML = calcLine(S.day.form);
+  handleInput(ev.target);
 });
 
-app.addEventListener("submit", async e => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-
-  if (e.target.id === "schedForm" && S.day?.mode === "leave") {
-    const D = S.day;
-    const fail = t => { D.msg = { text: t, kind: "err" }; render(); };
-    if (!D.pick.size) return fail("請選擇至少一位人員");
-    const leaveType = String(f.get("leaveType") || LEAVE_TYPES[0]);
-    D.leaveType = leaveType;
-    const nameFor = uid => staffName(uid) || "";
-    const dayList = S.sched.list.filter(s => s.date === D.date);
-    const already = new Set(leavesOnly(dayList).map(s => s.uid));
-    const uids = [...D.pick].filter(u => !already.has(u));
-    if (!uids.length) return fail("選的人這天已經是休假了");
-    // 這天已經有班的人：確認後一起刪掉那些班
-    const clash = shiftsOnly(dayList).filter(s => uids.includes(s.uid));
-    if (clash.length && !confirm(`${clash.map(s => `${schedName(s)}（${shiftLabel(s)}）`).join("、")} 這天已經有排班。\n設為休假會一併刪除這些班，確定嗎？`)) return;
-    S.busy = true; D.msg = null; render();
-    try {
-      await S.store.addSchedules(uids.map(uid => ({ uid, name: nameFor(uid), date: D.date, kind: "leave", leaveType })), clash.map(s => s.id));
-      await refreshSchedList();
-      openDay(D.date, null, "leave");
-      S.day.msg = { text: `已設為${leaveType}：${uids.map(nameFor).join("、")}${clash.length ? `（已刪除 ${clash.length} 個班）` : ""}`, kind: "ok" };
-    } catch (err) { D.msg = { text: "儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
-    S.busy = false; render();
-    return;
-  }
-
-  if (e.target.id === "schedForm") {
-    const D = S.day;
-    const fm = { start: String(f.get("start") || ""), end: String(f.get("end") || ""), breakMin: Math.max(0, Number(f.get("breakMin")) || 0), remote: f.get("remote") === "on" };
-    D.form = fm;
-    const fail = t => { D.msg = { text: t, kind: "err" }; render(); };
-    if (!D.pick.size) return fail("請選擇至少一位人員");
-    const offHere = leavesOnly(S.sched.list.filter(s => s.date === D.date)).filter(s => D.pick.has(s.uid));
-    if (offHere.length) return fail(`${offHere.map(schedName).join("、")} 這天休假，不能排班（要排班請先取消休假）`);
-    if (!fm.start || !fm.end) return fail("請填上班和下班時間");
-    if (fm.start === fm.end) return fail("上班和下班時間不能一樣");
-    if (shiftHours(fm) <= 0) return fail("扣掉休息時間後工時是 0，請檢查時間");
-    const nameFor = uid => staffName(uid) || "";
-    S.busy = true; D.msg = null; render();
-    try {
-      if (D.editId) {
-        const uid = [...D.pick][0];
-        await S.store.updateSchedule(D.editId, { uid, name: nameFor(uid), date: D.date, ...fm });
-      } else {
-        await S.store.addSchedules([...D.pick].map(uid => ({ uid, name: nameFor(uid), date: D.date, ...fm })));
+function handleInput(el) {
+  if (el.id === "f-query") { S.query = el.value; render(); return; }
+  if (el.id === "f-book") { S.bookQuery = el.value; render(); return; }
+  if (el.id === "x-refund" || el.id === "x-date" || el.classList.contains("pick")) { refreshCancelHint(); return; }
+  if (el.dataset?.k && draft) {
+    draft[el.dataset.k] = el.value;
+    if (el.dataset.k === "customer" && draft.kind === "income" && !draft.id && !draft.serviceDate) {
+      const hit = E.bookings(S.entries).filter(b => !b.cancelled && b.customer === el.value.trim() && b.serviceDate >= draft.date);
+      if (hit.length === 1) {
+        draft.serviceDate = hit[0].serviceDate;
+        draft.brand = hit[0].brand;
+        const e0 = hit[0].entries[0];
+        draft.serviceItem = e0.serviceItem || draft.serviceItem;
+        draft.payType = "尾款";
+        paintForm();
+        document.getElementById("d-customer").focus();
+        return;
       }
-      const who = [...D.pick].map(nameFor).join("、");
-      const wasEdit = !!D.editId;
-      await refreshSchedList();
-      openDay(D.date);
-      S.day.msg = { text: `${wasEdit ? "已更新" : "已加入"}：${who} ${shiftLabel(fm)}${fm.remote ? "（居家）" : ""}`, kind: "ok" };
-    } catch (err) { D.msg = { text: "儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
-    S.busy = false; render();
+    }
+    refreshHint();
+  }
+}
+
+document.addEventListener("change", ev => {
+  const el = ev.target;
+  if (el.classList?.contains("flag-pick")) {
+    if (el.checked) S.picked.add(el.value); else S.picked.delete(el.value);
+    render();
     return;
   }
-
-  if (e.target.id === "schedSetForm") {
-    if (!S.sched.settingsOk) { S.schedMsg = { text: "讀不到目前的設定，為了避免覆蓋，請按「重新整理」後再存", kind: "err" }; render(); window.scrollTo(0, 0); return; }
-    const v = {
-      ...S.sched.settings,   // 保留人員顏色等其他設定
-      start: String(f.get("start") || SCHED_DEFAULTS.start),
-      end: String(f.get("end") || SCHED_DEFAULTS.end),
-      breakMin: Math.max(0, Number(f.get("breakMin")) || 0),
-      cycleStart: String(f.get("cycleStart") || ""),
-    };
-    S.busy = true; render();
-    try { await S.store.saveScheduleSettings(v); S.sched.settings = v; S.schedMsg = { text: "排班預設值已儲存", kind: "ok" }; }
-    catch (err) { S.schedMsg = { text: "儲存失敗：" + (err.message || err) + RULES_HINT, kind: "err" }; }
-    S.busy = false; render(); window.scrollTo(0, 0);
+  if (el.id === "flag-all") {
+    const ids = [...document.querySelectorAll(".flag-pick")].map(x => x.value);
+    ids.forEach(id => (el.checked ? S.picked.add(id) : S.picked.delete(id)));
+    render();
     return;
   }
-
-  if (e.target.id === "authForm") {
-    const username = String(f.get("username") || "").trim().toLowerCase();
-    const password = String(f.get("password") || "");
-    if (!/^[a-z0-9_.-]{3,20}$/.test(username)) { setMsg("帳號只能用英文、數字、底線、點或減號，3–20 字"); return render(); }
-    if (S.mode === "signup") {
-      const displayName = String(f.get("displayName") || "").trim();
-      if (!displayName) { setMsg("請填姓名"); return render(); }
-      if (password !== f.get("password2")) { setMsg("兩次輸入的密碼不一樣"); return render(); }
-    }
-    S.busy = true; setMsg(null); render();
-    try {
-      let me;
-      if (S.mode === "signup") me = await S.store.signUp({ username, password, displayName: String(f.get("displayName")).trim(), role: S.role });
-      else {
-        me = await S.store.signIn({ username, password });
-        if (me.role !== S.role) {
-          await S.store.signOut();
-          throw new Error(me.role === "admin" ? "這是管理帳號，請切換到「管理員」登入" : "這是員工帳號，請切換到「員工」登入");
-        }
-      }
-      S.me = me; S.busy = false; await afterLogin();
-    } catch (err) {
-      S.busy = false; setMsg(err.message || String(err)); render();
-    }
-  }
-
-  if (e.target.id === "fixForm") {
-    const form = e.target;
-    const type = String(f.get("type"));
-    const at = new Date(`${f.get("date")}T${f.get("time")}`);
-    const reason = String(f.get("reason") || "").trim().slice(0, 50);
-    const oldest = new Date(); oldest.setDate(oldest.getDate() - FIX_DAYS + 1); oldest.setHours(0, 0, 0, 0);
-    if (isNaN(at)) { S.fixMsg = { text: "請選擇日期和時間", kind: "err" }; return render(); }
-    if (at > new Date()) { S.fixMsg = { text: "不能補打未來的時間", kind: "err" }; return render(); }
-    if (at < oldest) { S.fixMsg = { text: `只能補 ${FIX_DAYS} 天內的卡，更早的請找管理員`, kind: "err" }; return render(); }
-    if (!confirm(`確定要補打卡嗎？\n\n${TYPES[type]}　${fmtDate(at)} ${fmtTime(at)}`)) return;
-    S.busy = true; S.fixMsg = null; render();
-    try {
-      await S.store.addPunch(type, S.me.uid, at, reason);
-      S.myMonth = fmtMonth(at);
-      await reloadStaff();
-      S.fixMsg = { text: `已補登 ${TYPES[type]} ${fmtDate(at)} ${fmtTime(at)}`, kind: "ok" };
-      document.getElementById("fixForm")?.reset();
-    } catch (err) { S.fixMsg = { text: "補打卡失敗：" + (err.message || err), kind: "err" }; }
-    S.busy = false; render();
-  }
-
-  if (e.target.id === "addForm") {
-    const at = new Date(String(f.get("at")));
-    if (isNaN(at)) return;
-    S.busy = true;
-    try { await S.store.addPunch(String(f.get("type")), S.selected, at); S.adminMsg = { text: `已補登 ${TYPES[f.get("type")]} ${fmtDate(at)} ${fmtTime(at)}`, kind: "ok" }; }
-    catch (err) { S.adminMsg = { text: "補登失敗：" + (err.message || err), kind: "err" }; }
-    S.busy = false;
-    await loadAdmin();
+  if (el.id === "f-month") { S.month = el.value || S.month; S.onlyFlagged = false; render(); return; }
+  if (el.id === "f-year") { S.year = +el.value; S.drill = null; render(); return; }
+  if (el.id === "import-file" && el.files[0]) { startImport(el.files[0]); el.value = ""; return; }
+  if (draft && ["d-category", "d-method", "d-paytype", "d-service", "d-feestatus"].includes(el.id)) {
+    if (el.id === "d-paytype" && ["租棚", "儲值金", "其他"].includes(el.value) && draft.serviceItem === "個人") draft.serviceItem = "";
+    const focus = el.id; paintForm();
+    document.getElementById(focus)?.focus();
   }
 });
 
-// 時鐘與進行中的工時每秒更新
-setInterval(() => {
-  const c = document.getElementById("clock");
-  if (!c) return;
-  const n = new Date();
-  c.textContent = `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
-  const typing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName);
-  if (n.getSeconds() === 0 && S.me?.role === "staff" && !S.busy && !typing) render();
-}, 1000);
+document.addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const f = ev.target;
+  if (f.id === "login") {
+    S.loginMsg = "";
+    try { await store.signIn(document.getElementById("l-email").value.trim(), document.getElementById("l-pass").value); }
+    catch (e) { S.loginMsg = e.message; render(); }
+  }
+  else if (f.id === "entry-form") await submitForm();
+  else if (f.id === "move-form") {
+    const date = document.getElementById("m-date").value;
+    const sel = picked();
+    if (!date || !sel.length) { document.getElementById("d-err").innerHTML = `<div class="err">請選新的日期和要搬的項目。</div>`; return; }
+    if (await save(E.reschedule(sel, date, who(), new Date().toISOString()), `已改到 ${date}`)) dlg.close();
+  }
+  else if (f.id === "cancel-form") {
+    const date = document.getElementById("x-date").value;
+    const refund = +document.getElementById("x-refund").value || 0;
+    const method = document.getElementById("x-method").value;
+    const fail = m => { document.getElementById("d-err").innerHTML = `<div class="err">${esc(m)}</div>`; };
+    if (!date) return fail("請填取消日期。");
+    if (!picked().length) return fail("請至少勾選一個項目。");
+    if (refund > 0 && !method) return fail("請選退款方式。");
+    try {
+      const docs = E.cancelBooking(picked(), { date, refund, method, who: who(), now: new Date().toISOString(), makeId: newId });
+      if (await save(docs, "預約已取消")) dlg.close();
+    } catch (e) { fail(e.message); }
+  }
+  else if (f.id === "stored-form") {
+    const date = document.getElementById("u-date").value, amount = +document.getElementById("u-amount").value;
+    const left = modal.entry.amount - (modal.entry.lines || []).reduce((s, l) => s + l.amount, 0);
+    const fail = m => { document.getElementById("d-err").innerHTML = `<div class="err">${esc(m)}</div>`; };
+    if (!date || !(amount > 0)) return fail("請填服務日期和金額。");
+    if (amount > left) return fail(`使用金額不能超過餘額 ${money(left)}。`);
+    const e = clone(modal.entry);
+    e.lines = [...(e.lines || []), { date, amount, item: document.getElementById("u-item").value.trim() }];
+    if (await save([e], "已記下使用")) dlg.close();
+  }
+  else if (f.id === "import-form") {
+    const docs = S.importState.fresh.map(p => ({ ...p.entry, id: newId(), ...(p.flags.length ? { flags: p.flags } : {}) }));
+    if (await save(docs, `已匯入 ${docs.length} 筆`)) {
+      dlg.close();
+      S.month = docs[0].date.slice(0, 7);
+      S.year = +docs[0].date.slice(0, 4);
+      S.tab = "ledger";
+      render();
+    }
+  }
+});
+
+dlg.addEventListener("close", () => { draft = null; modal = null; render(); });
 
 /* ---------- 啟動 ---------- */
-(async () => {
+(async function boot() {
   try {
-    S.store = FIREBASE_CONFIG ? await makeFirebaseStore(FIREBASE_CONFIG) : makeDemoStore();
-    if (S.store.mode === "demo") document.getElementById("banner").innerHTML = `<div class="banner">示範模式：資料只存在這台瀏覽器。填入 Firebase 設定後，所有人才會共用同一份資料。</div>`;
-    S.me = await S.store.init();
-    if (S.me) { S.role = S.me.role; await afterLogin(); } else render();
-  } catch (e) {
-    app.innerHTML = `<div class="wrap narrow"><div class="card"><h2>無法啟動</h2><p class="muted">${esc(e.message || e)}</p><p class="small muted">請檢查 FIREBASE_CONFIG 是否正確。</p></div></div>`;
+    store = FIREBASE_CONFIG ? await makeFirebaseStore(FIREBASE_CONFIG) : makeDemoStore();
+  } catch {
+    app.innerHTML = `<div class="wrap"><div class="err">連不上資料庫，請檢查網路後重新整理。</div></div>`;
+    return;
   }
+  if (store.demo) { S.month = "2026-10"; S.year = 2026; }
+  setTimeout(() => {
+    if (!S.ready) app.innerHTML = `<div class="wrap narrow"><div class="card stack"><div class="err">登入服務一直沒有回應。請重新整理；如果是在 LINE、IG 或其他 App 裡開啟，請改用 Safari 或 Chrome 打開。</div><button class="btn" onclick="location.reload()">重新整理</button></div></div>`;
+  }, 15000);
+  store.start(user => {
+    S.me = user;
+    S.ready = true;
+    S.loaded = false;
+    S.accessError = "";
+    if (!user) { S.entries = []; render(); return; }
+    store.subscribe((entries, settings) => {
+      S.entries = entries;
+      S.loaded = true;
+      S.settings = mergeSettings(settings);
+      if (!dlg.open) render();
+    }, err => { S.accessError = err.message; render(); });
+  });
+  render();
 })();
 </script>
 </body>
