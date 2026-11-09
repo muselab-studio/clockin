@@ -119,6 +119,10 @@ tfoot td{font-weight:700;border-bottom:0}
 .tp select{width:auto;flex:1;min-width:0;padding:10px 8px;font-variant-numeric:tabular-nums}
 .tp span{color:var(--muted);font-weight:700}
 /* 月曆上方：每個人的班表開關 */
+/* 月曆上方：全部／上班／休假 一鍵切換 */
+.vseg{display:inline-flex;margin:0 0 10px;max-width:100%}
+.vseg button{flex:none;padding:6px 16px}
+.sc.alloff{text-align:center;font-weight:700;color:var(--accent);border-color:var(--accent);white-space:normal;line-height:1.25;text-overflow:clip}
 .pfilter{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
 .pfilter button{--pc:#857d74;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;color:var(--muted)}
 .pfilter button .sw{width:10px;height:10px;border-radius:50%;border:2px solid var(--pc);flex:none}
@@ -501,7 +505,8 @@ const S = {
   crew: null, offToday: [], myUpcoming: [], crewErr: null,
   colors: {},   // uid -> 顏色（存在 meta/schedule 的 colors）
   dropAsk: null,   // 拖曳班次放開後，詢問複製還是移動 { s, to, note }
-  calHide: { admin: new Set(), staff: new Set() },   // 月曆上暫時關掉不看的人（各自存在自己的瀏覽器）
+  calHide: { admin: new Set(), staff: new Set() },
+  calView: { admin: "all", staff: "all" },   // 月曆顯示：all 全部 / work 只看上班 / off 只看休假   // 月曆上暫時關掉不看的人（各自存在自己的瀏覽器）
   staffCal: { month: fmtMonth(new Date()), list: null, sel: fmtDate(new Date()), err: null },   // 前台月班表
 };
 const app = document.getElementById("app");
@@ -629,48 +634,75 @@ function viewPeopleFilter(where, people) {
   </div>`;
 }
 
+/* 月曆共用：一格最多顯示幾個人、全部／上班／休假切換、全員休假 */
+const MAX_CHIPS = 5;
+const viewKey = where => `clockin_view_${where}_${S.me?.uid || ""}`;
+function loadView(where) { try { const v = localStorage.getItem(viewKey(where)); return ["all", "work", "off"].includes(v) ? v : "all"; } catch { return "all"; } }
+function saveView(where) { try { localStorage.setItem(viewKey(where), S.calView[where]); } catch {} }
+function viewModeBar(where) {
+  const cur = S.calView[where];
+  const b = (k, label) => `<button type="button" data-act="cv" data-w="${where}" data-v="${k}" class="${cur === k ? "on" : ""}">${label}</button>`;
+  return `<div><div class="seg vseg">${b("all", "全部")}${b("work", "上班")}${b("off", "休假")}</div></div>`;
+}
+const byMode = (where, items) => S.calView[where] === "work" ? shiftsOnly(items) : S.calView[where] === "off" ? leavesOnly(items) : items;
+// 全員休假：這天沒有人上班，而且名單上每個人都有請假
+function isAllOff(dayAll, roster) {
+  if (!roster.length || shiftsOnly(dayAll).length) return false;
+  const off = new Set(leavesOnly(dayAll).map(s => s.uid));
+  return roster.every(uid => off.has(uid));
+}
+const leaveChip = (s, name, extra = "") => `<div class="sc off${extra}" title="${esc(`${name} ${leaveLabel(s)}`)}">${esc(name)} 休</div>`;
+const ALL_OFF_CHIP = `<div class="sc off alloff">全員休假</div>`;
+function dayCount(where, items) {
+  const n = S.calView[where] === "off" ? leavesOnly(items).length : shiftsOnly(items).length;
+  return n ? `<span>${n} ${S.calView[where] === "off" ? "休" : "人"}</span>` : "";
+}
+
 /* 前台：整個月的班表（只能看，不能改） */
 function viewStaffCal() {
   const C = S.staffCal;
   const { first, gridStart, gridEnd } = gridRange(C.month);
   const today = fmtDate(new Date());
-  const byDate = {};
+  const byDate = {}, allByDate = {};
   const hid = S.calHide.staff;
-  for (const s of C.list || []) if (!hid.has(s.uid)) (byDate[s.date] ??= []).push(s);
+  for (const s of C.list || []) { (allByDate[s.date] ??= []).push(s); if (!hid.has(s.uid)) (byDate[s.date] ??= []).push(s); }
   // 開關列：本月有出現的人（自己排第一個）
   const seen = new Map();
   for (const s of [...(C.list || [])].sort((a, b) => (a.uid === S.me.uid ? -1 : b.uid === S.me.uid ? 1 : (a.name || "").localeCompare(b.name || "", "zh-Hant"))))
     if (!seen.has(s.uid)) seen.set(s.uid, { uid: s.uid, name: s.name || "（未知）" });
   if (!seen.has(S.me.uid)) seen.set(S.me.uid, { uid: S.me.uid, name: S.me.displayName });
+  const roster = [...seen.keys()];
   const sortDay = arr => [...shiftsOnly(arr).sort(byStart), ...leavesOnly(arr).sort((a, b) => (a.name || "").localeCompare(b.name || "", "zh-Hant"))];
   let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
     const k = fmtDate(d);
-    const items = sortDay(byDate[k] || []);
-    const nWork = shiftsOnly(items).length;
-    const chips = items.slice(0, 4).map(s => {
-      const name = esc(s.name || "（未知）");
+    const allOff = isAllOff(allByDate[k] || [], roster);
+    const items = allOff ? [] : byMode("staff", sortDay(byDate[k] || []));
+    const chips = allOff ? ALL_OFF_CHIP : items.slice(0, MAX_CHIPS).map(s => {
       const me = s.uid === S.me.uid ? " me" : "";
       return isLeave(s)
-        ? `<div class="sc off${me}">休 ${name}</div>`
-        : `<div class="sc${me}" style="--pc:${pcolor(s.uid)}"${isRemote(s) ? ` title="居家上班"` : ""}>${homeIcon(s)}${name} <span class="t">${s.start}–${s.end}</span></div>`;
+        ? leaveChip(s, s.name || "（未知）", me)
+        : `<div class="sc${me}" style="--pc:${pcolor(s.uid)}"${isRemote(s) ? ` title="居家上班"` : ""}>${homeIcon(s)}${esc(s.name || "（未知）")} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}${k === C.sel ? " sel" : ""}" data-act="cday" data-v="${k}">
-      <div class="dnum">${d.getDate()}${nWork ? `<span>${nWork} 人</span>` : ""}</div>
-      ${chips}${items.length > 4 ? `<div class="more">+${items.length - 4}</div>` : ""}
+      <div class="dnum">${d.getDate()}${allOff ? "" : dayCount("staff", items)}</div>
+      ${chips}${items.length > MAX_CHIPS ? `<div class="more">+${items.length - MAX_CHIPS}</div>` : ""}
     </div>`;
   }
   // 選到的那天：完整名單和時間
   const selItems = sortDay(byDate[C.sel] || []);
   const selWork = shiftsOnly(selItems), selOff = leavesOnly(selItems);
+  const mode = S.calView.staff;
+  const selAllOff = isAllOff(allByDate[C.sel] || [], roster);
   const detail = !C.sel ? "" : `
     <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
-      <h2 style="font-size:15px;margin:0 0 4px">${dayLabel(C.sel)}${C.sel === today ? "・今天" : ""}</h2>
-      ${selWork.length ? `<ul class="list">${selWork.map(s => `<li><span class="rowl who">
+      <h2 style="font-size:15px;margin:0 0 4px">${dayLabel(C.sel)}${C.sel === today ? "・今天" : ""}${selAllOff ? ` <span class="pill off">全員休假</span>` : ""}</h2>
+      ${mode === "off" ? "" : selWork.length ? `<ul class="list">${selWork.map(s => `<li><span class="rowl who">
           <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc((s.name || "?").slice(0, 1))}</span>
           <span><b>${esc(s.name || "（未知）")}</b>${s.uid === S.me.uid ? ` <span class="pill work">你</span>` : ""}${homePill(s)}</span></span>
           <b>${shiftLabel(s)}</b></li>`).join("")}</ul>` : `<div class="small muted" style="padding:8px 0">這天沒有人排班</div>`}
-      ${selOff.length ? `<div class="small muted" style="margin-top:6px">休假：${selOff.map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}（${esc(leaveLabel(s))}）`).join("、")}</div>` : ""}
+      ${mode === "work" ? "" : selOff.length ? `<div class="small muted" style="margin-top:6px">休假：${selOff.map(s => `${esc(s.name || "（未知）")}${s.uid === S.me.uid ? "（你）" : ""}（${esc(leaveLabel(s))}）`).join("、")}</div>`
+        : mode === "off" ? `<div class="small muted" style="padding:8px 0">這天沒有人休假</div>` : ""}
     </div>`;
   return `
   <div class="card" style="margin-bottom:16px">
@@ -683,6 +715,7 @@ function viewStaffCal() {
       </div>
     </div>
     ${C.err ? `<div class="empty">${esc(C.err)}</div>` : !C.list ? `<div class="empty">讀取中…</div>` : `
+      ${viewModeBar("staff")}
       ${viewPeopleFilter("staff", [...seen.values()])}
       <div class="cal compact">${cells}</div>
       <p class="small muted" style="margin:8px 0 0">點任一天可以看那天誰上班、幾點到幾點。粗框是你自己的班，有小房子的是居家上班。</p>
@@ -868,24 +901,26 @@ function viewSchedule() {
   const { first, gridStart, gridEnd } = gridRange(S.month);
   const { dayFlags } = analyzeSchedule(P.list, P.settings);
   const today = fmtDate(new Date());
-  const byDate = {};
-  for (const s of P.list) if (!S.calHide.admin.has(s.uid)) (byDate[s.date] ??= []).push(s);
+  const byDate = {}, allByDate = {};
+  for (const s of P.list) { (allByDate[s.date] ??= []).push(s); if (!S.calHide.admin.has(s.uid)) (byDate[s.date] ??= []).push(s); }
+  const roster = P.staff.map(u => u.uid);
   let cells = "一二三四五六日".split("").map(d => `<div class="dow">${d}</div>`).join("");
   for (let d = new Date(gridStart); d <= gridEnd; d = addDays(d, 1)) {
     const k = fmtDate(d);
     const shifts = shiftsOnly(byDate[k] || []).sort(byStart);
     const leaves = leavesOnly(byDate[k] || []).sort((a, b) => schedName(a).localeCompare(schedName(b), "zh-Hant"));
-    const items = [...shifts, ...leaves];
-    const chips = items.slice(0, 4).map(s => {
+    const allOff = isAllOff(allByDate[k] || [], roster);
+    const items = allOff ? [] : byMode("admin", [...shifts, ...leaves]);
+    const chips = allOff ? ALL_OFF_CHIP : items.slice(0, MAX_CHIPS).map(s => {
       const name = schedName(s);
-      if (isLeave(s)) return `<div class="sc off" title="${esc(`${name} ${leaveLabel(s)}`)}">休 ${esc(name)} <span class="t">${esc(leaveLabel(s))}</span></div>`;
+      if (isLeave(s)) return leaveChip(s, name);
       const fl = dayFlags[s.uid + "|" + k];
       const tip = `${name} ${shiftLabel(s)}${isRemote(s) ? "（居家）" : ""}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
       return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${homeIcon(s)}${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
     }).join("");
     cells += `<div class="day${d.getMonth() !== first.getMonth() ? " other" : ""}${k === today ? " today" : ""}" data-act="sday" data-v="${k}">
-      <div class="dnum">${d.getDate()}${shifts.length ? `<span>${shifts.length} 人</span>` : ""}</div>
-      ${chips}${items.length > 4 ? `<div class="more">還有 ${items.length - 4} 筆</div>` : ""}
+      <div class="dnum">${d.getDate()}${allOff ? "" : dayCount("admin", items)}</div>
+      ${chips}${items.length > MAX_CHIPS ? `<div class="more">還有 ${items.length - MAX_CHIPS} 筆</div>` : ""}
     </div>`;
   }
   return `
@@ -899,9 +934,10 @@ function viewSchedule() {
       </div>
     </div>
     ${P.err ? `<div class="msg err" style="margin:0 0 12px">${esc(P.err)}</div>` : ""}
+    ${viewModeBar("admin")}
     ${viewPeopleFilter("admin", P.staff.map(u => ({ uid: u.uid, name: u.displayName })))}
     <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「休」是休假；標「!」的班有工時提醒，點進去可以看原因。</p>
+    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「名字 休」是休假（假別在點進去的那天可以看到）；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
   ${viewSchedColors()}
@@ -1303,6 +1339,7 @@ async function refreshAdminLeft() {
 async function afterLogin() {
   setMsg(null);
   S.calHide = { admin: loadHidden("admin"), staff: loadHidden("staff") };
+  S.calView = { admin: loadView("admin"), staff: loadView("staff") };
   if (S.me.role === "admin") { S.selected = null; S.open.clear(); S.day = null; await (S.adminTab === "schedule" ? loadSchedule() : loadAdmin()); }
   else {
     S.open.clear(); S.myMonth = fmtMonth(new Date()); S.myShifts = null; S.fixMsg = null;
@@ -1412,6 +1449,7 @@ app.addEventListener("click", async e => {
   const act = el.dataset.act, v = el.dataset.v;
 
   /* ----- 排班 ----- */
+  if (act === "cv") { S.calView[el.dataset.w] = v; saveView(el.dataset.w); render(); return; }   // 全部／上班／休假
   if (act === "pf") {   // 月曆人員開關
     const w = el.dataset.w, hid = S.calHide[w];
     if (v === "__all") hid.clear();
