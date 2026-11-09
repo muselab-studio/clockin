@@ -651,7 +651,7 @@ function isAllOff(dayAll, roster) {
   const off = new Set(leavesOnly(dayAll).map(s => s.uid));
   return roster.every(uid => off.has(uid));
 }
-const leaveChip = (s, name, extra = "") => `<div class="sc off${extra}" title="${esc(`${name} ${leaveLabel(s)}`)}">${esc(name)} 休</div>`;
+const leaveChip = (s, name, extra = "", draggable = false) => `<div class="sc off${extra}"${draggable ? ` data-sid="${esc(s.id)}"` : ""} title="${esc(`${name} ${leaveLabel(s)}`)}">${esc(name)} 休</div>`;
 const ALL_OFF_CHIP = `<div class="sc off alloff">全員休假</div>`;
 function dayCount(where, items) {
   const n = S.calView[where] === "off" ? leavesOnly(items).length : shiftsOnly(items).length;
@@ -913,7 +913,7 @@ function viewSchedule() {
     const items = allOff ? [] : byMode("admin", [...shifts, ...leaves]);
     const chips = allOff ? ALL_OFF_CHIP : items.slice(0, MAX_CHIPS).map(s => {
       const name = schedName(s);
-      if (isLeave(s)) return leaveChip(s, name);
+      if (isLeave(s)) return leaveChip(s, name, "", true);
       const fl = dayFlags[s.uid + "|" + k];
       const tip = `${name} ${shiftLabel(s)}${isRemote(s) ? "（居家）" : ""}，排 ${fmtH(shiftHours(s))} 小時${fl ? "\n" + fl.join("\n") : ""}`;
       return `<div class="sc${fl ? " flag" : ""}" data-sid="${esc(s.id)}" style="--pc:${pcolor(s.uid)}" title="${esc(tip)}">${homeIcon(s)}${esc(name)} <span class="t">${s.start}–${s.end}</span></div>`;
@@ -937,7 +937,7 @@ function viewSchedule() {
     ${viewModeBar("admin")}
     ${viewPeopleFilter("admin", P.staff.map(u => ({ uid: u.uid, name: u.displayName })))}
     <div class="cal">${cells}</div>
-    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「名字 休」是休假（假別在點進去的那天可以看到）；標「!」的班有工時提醒，點進去可以看原因。</p>
+    <p class="small muted" style="margin:12px 0 0">點任一天就能排班或設定休假。按住已排的班或休假可以拖到別天（手機請長按再拖），放開後選複製或移動。有小房子的是居家上班；虛線框「名字 休」是休假（假別在點進去的那天可以看到）；標「!」的班有工時提醒，點進去可以看原因。</p>
   </div>
   ${viewSchedSummary()}
   ${viewSchedColors()}
@@ -1132,19 +1132,20 @@ function viewDayModal() {
 function viewDropModal() {
   const { s, to, note } = S.dropAsk;
   const name = schedName(s);
+  const leave = isLeave(s), what = leave ? "休假" : "班";
   return `
   <div class="modal-bg" data-close="1">
     <div class="modal" role="dialog" aria-modal="true" style="max-width:420px">
       <h2 style="margin:0 0 12px">要複製還是移動？</h2>
       <div class="rowl">
         <span class="dotname" style="--pc:${pcolor(s.uid)}">${esc(name.slice(0, 1))}</span>
-        <span class="who"><b>${esc(name)}</b>${homePill(s)}<span class="small muted">${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分</span></span>
+        <span class="who"><b>${esc(name)}</b>${homePill(s)}<span class="small muted">${leave ? esc(leaveLabel(s)) : `${shiftLabel(s)}・休息 ${Number(s.breakMin) || 0} 分`}</span></span>
       </div>
       <p style="margin:14px 0 4px;font-size:16px">${dayLabel(s.date)}　→　<b>${dayLabel(to)}</b></p>
-      ${note ? `<div class="msg err" style="margin-top:8px">${esc(note)}，繼續的話這天會有兩個班。</div>` : ""}
+      ${note ? `<div class="msg err" style="margin-top:8px">${esc(note)}${leave ? "。" : "，繼續的話這天會有兩個班。"}</div>` : ""}
       <div class="small muted" style="margin-top:10px;line-height:1.7">
-        <b>複製</b>：${dayLabel(s.date)} 的班保留，${dayLabel(to)} 再加一個一樣的班<br>
-        <b>移動</b>：班改到 ${dayLabel(to)}，${dayLabel(s.date)} 就沒有這個班了
+        <b>複製</b>：${dayLabel(s.date)} 的${what}保留，${dayLabel(to)} 再加一個一樣的${what}<br>
+        <b>移動</b>：${what}改到 ${dayLabel(to)}，${dayLabel(s.date)} 就沒有這個${what}了
       </div>
       <div class="btnrow">
         <button class="btn" data-act="dropdo" data-v="copy" ${S.busy ? "disabled" : ""}>複製</button>
@@ -1355,7 +1356,7 @@ const drag = { s: null, active: false, ghost: null, over: null, x0: 0, y0: 0, x:
 
 function dragStart(chip, x, y) {
   if (S.me?.role !== "admin" || S.adminTab !== "schedule" || S.busy || S.day || S.dropAsk) return false;
-  const s = S.sched?.list.find(it => it.id === chip.dataset.sid && !isLeave(it));
+  const s = S.sched?.list.find(it => it.id === chip.dataset.sid);
   if (!s) return false;
   Object.assign(drag, { s, chip, active: false, x0: x, y0: y, x, y });
   return true;
@@ -1393,6 +1394,18 @@ function dragEnd(cancel = false) {
 }
 function askDrop(s, to) {
   const list = S.sched.list;
+  if (isLeave(s)) {
+    // 休假：那天已經休假就擋下；那天有班的話，確認後會一起刪掉那個班
+    if (list.some(x => x.date === to && x.uid === s.uid && isLeave(x))) {
+      S.schedMsg = { text: `${schedName(s)} ${dayLabel(to)} 已經是休假了`, kind: "err" };
+      render(); return;
+    }
+    const clash = shiftsOnly(list).filter(x => x.date === to && x.uid === s.uid);
+    S.schedMsg = null;
+    S.dropAsk = { s, to, clash: clash.map(x => x.id),
+      note: clash.length ? `${schedName(s)} ${dayLabel(to)} 有 ${clash.map(shiftLabel).join("、")} 的班，放休假會一併刪除這個班` : "" };
+    render(); return;
+  }
   if (list.some(x => x.date === to && x.uid === s.uid && isLeave(x))) {
     S.schedMsg = { text: `${schedName(s)} ${dayLabel(to)} 休假，不能排班（要排請先取消休假）`, kind: "err" };
     render(); return;
@@ -1405,6 +1418,7 @@ function askDrop(s, to) {
 
 // 滑鼠
 app.addEventListener("pointerdown", e => {
+  drag.suppress = false;   // 新的一次點擊開始了，不再擋
   if (e.pointerType !== "mouse" || e.button !== 0) return;
   const chip = e.target.closest(".cal [data-sid]");
   if (chip && dragStart(chip, e.clientX, e.clientY)) e.preventDefault();   // 避免拖的時候選到文字
@@ -1419,6 +1433,7 @@ window.addEventListener("keydown", e => { if (e.key === "Escape" && drag.active)
 
 // 手機：長按才開始拖
 app.addEventListener("touchstart", e => {
+  drag.suppress = false;
   if (e.touches.length !== 1) return;
   const chip = e.target.closest(".cal [data-sid]");
   const t = e.touches[0];
@@ -1463,10 +1478,18 @@ app.addEventListener("click", async e => {
     const { s, to } = S.dropAsk;
     S.busy = true; render();
     try {
-      if (v === "move") await S.store.updateSchedule(s.id, { date: to });
-      else await S.store.addSchedules([{ uid: s.uid, name: staffName(s.uid) || s.name || "", date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote }]);
+      const name = staffName(s.uid) || s.name || "";
+      if (isLeave(s)) {
+        // 休假：新增一筆到目標日，並一次刪掉目標日的班（移動的話連原本的休假也刪）
+        const clash = S.dropAsk.clash || [];
+        await S.store.addSchedules([{ uid: s.uid, name, date: to, kind: "leave", leaveType: leaveLabel(s) }], v === "move" ? [s.id, ...clash] : clash);
+      }
+      else if (v === "move") await S.store.updateSchedule(s.id, { date: to });
+      else await S.store.addSchedules([{ uid: s.uid, name, date: to, start: s.start, end: s.end, breakMin: Number(s.breakMin) || 0, remote: !!s.remote }]);
       await refreshSchedList();
-      S.schedMsg = { text: `已${v === "move" ? "移動" : "複製"}：${schedName(s)} ${shiftLabel(s)}，${dayLabel(s.date)} → ${dayLabel(to)}`, kind: "ok" };
+      const label = isLeave(s) ? leaveLabel(s) : shiftLabel(s);
+      const removed = isLeave(s) && S.dropAsk.clash?.length ? `（已刪除那天 ${S.dropAsk.clash.length} 個班）` : "";
+      S.schedMsg = { text: `已${v === "move" ? "移動" : "複製"}：${schedName(s)} ${label}，${dayLabel(s.date)} → ${dayLabel(to)}${removed}`, kind: "ok" };
     } catch (err) { S.schedMsg = { text: `${v === "move" ? "移動" : "複製"}失敗：` + (err.message || err) + RULES_HINT, kind: "err" }; }
     S.dropAsk = null; S.busy = false; render(); return;
   }
